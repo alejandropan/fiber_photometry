@@ -22,21 +22,21 @@ r_trials = np.nan_to_num(right_trials)
 signed_contrast = r_trials - l_trials
 feedback = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.feedbackType.npy')
 
-def bleach_correct(fluo_times, avg_window = 60):
+def bleach_correct(nacc, avg_window = 60):
     '''
     Correct for bleaching of gcamp across the session. Calculates
     DF/F
-    
     Parameters
     ----------
-    fluo_times: alf file with times for fluorescence frames
+    nacc: alf file with fluorescence values for the area of interest
     avg_window: time for sliding window to calculate F value
-    
     '''
-    
-
-
-#Delete before first trial and last trial
+    # First calculate sliding window
+    F = np.convolve(nacc, np.ones((avg_window,))/avg_window, mode='same')
+    nacc_corrected = nacc/F
+    return nacc_corrected
+        
+        
 def divide_in_trials(fluo_times, cue_times, nacc):
     '''
     Makes list of list with fluorescnece and timestamps divided by trials
@@ -48,6 +48,8 @@ def divide_in_trials(fluo_times, cue_times, nacc):
     cue_times:  alf file with times for cue (the start of the trial)
     nacc: alf file with fluorescence values for the area of interest
     '''
+    #Delete before first trial and last trial
+
     fluo_times_s = np.delete(fluo_times,np.where(fluo_times < cue_times[0]))
     nacc_s = np.delete(nacc,np.where(fluo_times < cue_times[0]))
     fluo_times_f = np.delete(fluo_times_s,np.where(fluo_times_s > cue_times[-1]))
@@ -75,12 +77,8 @@ def divide_in_trials(fluo_times, cue_times, nacc):
 
 
 
-# Z score
-
-
-
 def fp_psth(fluo_time_in_trials, cue_times, trial_list = np.arange(len(cue_times)),
-            t_range = [-0.1, 1.0], T_BIN = 0.03):
+            t_range = [-0.1, 1.0], T_BIN = 0.03, plot = False):
     '''
 
     Parameters
@@ -93,6 +91,7 @@ def fp_psth(fluo_time_in_trials, cue_times, trial_list = np.arange(len(cue_times
     The default is np.arange(len(cue_times)).
     t_range : Time range for fp_psth. The default is [-0.1, 1.0].
     T_BIN : Size of the bin. The default is 0.03s (frame rate)
+    plot: Whether to plot a preliminary PSTH at the end
 
     Returns
     -------
@@ -120,7 +119,8 @@ def fp_psth(fluo_time_in_trials, cue_times, trial_list = np.arange(len(cue_times
     x = np.arange(t_range[0], t_range[1], T_BIN)[:-1]
     
     # Plot
-    plt.plot(x,np.nanmean(t,0))
+    if plot == True:
+        plt.plot(x,np.nanmean(t,0)) 
     
     return t, x
 
@@ -136,7 +136,7 @@ def plot_psth(condition1):
     plt.plot(x, y)
     plt.fill_between(x, y-error, y+error)
     plt.xlabel('time(s)')
-    plt.ylabel('F z-score')
+    plt.ylabel('DF/F z-score')
 
 
 
@@ -146,60 +146,76 @@ def plot_psth(condition1):
 
 
 # psth easy vs hard correct trials  stim and feedback
-easy = np.where(signed_contrast == 1)[0]
-hard = np.where(signed_contrast == 0.125)[0]
-correct = np.where(feedback == 1)[0]
-easy = np.intersect1d(easy, correct)
-hard = np.intersect1d(hard, correct)
 
-condition1 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy)
-condition2 = fp_psth(fluo_time_in_trials, cue_times, trial_list = hard)
-
-
-F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
-F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
-
-
-condition1 = (condition1[0]-F1, condition1[1])
-condition2 = (condition2[0]-F2, condition2[1])
-
-
-fig, ax = plt.subplots()
-plot_psth(condition1)
-plot_psth(condition2) 
-
-condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)    
-condition2 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = hard)   
-
-F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
-F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
-
-condition1 = (condition1[0]-F1, condition1[1])
-condition2 = (condition2[0]-F2, condition2[1])
-
-fig, ax = plt.subplots()
-plot_psth(condition1)
-plot_psth(condition2) 
+def easy_vs_hard(signed_contrast,feedback,fluo_time_in_trials,
+                 subtract_baseline =  True):
+    '''
+    Figure function plots Psth for stim and feedback from easy 
+    and hard trials
+    '''
+    easy = np.where(signed_contrast == 1)[0]
+    hard = np.where(signed_contrast == 0.125)[0]
+    correct = np.where(feedback == 1)[0]
+    easy = np.intersect1d(easy, correct)
+    hard = np.intersect1d(hard, correct)
+    
+    condition1 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy)
+    condition2 = fp_psth(fluo_time_in_trials, cue_times, trial_list = hard)
+    
+    if subtract_baseline ==  True:
+        F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+        F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+        condition1 = (condition1[0]-F1, condition1[1])
+        condition2 = (condition2[0]-F2, condition2[1])
+    
+    
+    fig, ax = plt.subplots(1,2, figsize=(10,10))
+    plt.sca(ax[0])
+    ax[0].set_title('Go Cue')
+    plot_psth(condition1)
+    plot_psth(condition2) 
+    
+    condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)    
+    condition2 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = hard)   
+    
+    if subtract_baseline ==  True:
+        F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+        F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+        condition1 = (condition1[0]-F1, condition1[1])
+        condition2 = (condition2[0]-F2, condition2[1])
+    
+    plt.sca(ax[1])
+    ax[1].set_title('Reward Cue')
+    plot_psth(condition1)
+    plot_psth(condition2) 
 
 
 # ipsilateral vs contra easy trial stim
-easy_r = np.where(signed_contrast == 1)[0]
-easy_l = np.where(signed_contrast == -1)[0]
-condition1 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy_r)
-condition2 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy_l)
-
-
-F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
-F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
-
-
-condition1 = (condition1[0]-F1, condition1[1])
-condition2 = (condition2[0]-F2, condition2[1])
-
-
-fig, ax = plt.subplots()
-plot_psth(condition1)
-plot_psth(condition2) 
+def easy_vs_hard(signed_contrast,feedback,fluo_time_in_trials,
+                 subtract_baseline =  True):
+    '''
+    Figure function plots Psth for stim and feedback from easy 
+    and hard trials
+    '''
+    easy = np.where(signed_contrast == 1)[0]
+    hard = np.where(signed_contrast == 0.125)[0]
+    correct = np.where(feedback == 1)[0]
+    easy = np.intersect1d(easy, correct)
+    hard = np.intersect1d(hard, correct)
+    easy_r = np.where(signed_contrast == 1)[0]
+    easy_l = np.where(signed_contrast == -1)[0]
+    condition1 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy_r)
+    condition2 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy_l)
+    
+    F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+    F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+    
+    condition1 = (condition1[0]-F1, condition1[1])
+    condition2 = (condition2[0]-F2, condition2[1])
+    
+    fig, ax = plt.subplots()
+    plot_psth(condition1)
+    plot_psth(condition2) 
 
 # ipsilateral vs contra easy trial feedback
 easy_r = np.where(signed_contrast == 1)[0]
@@ -364,11 +380,13 @@ correct = np.where(feedback == 1)[0]
 easy = np.intersect1d(easy_raw, correct)
 f_condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)
 F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), (len(f_condition1[0]), 1))
-f_condition1 = (condition1[0]-F1, condition1[1])
+f_condition1 = (f_condition1[0]-F1, f_condition1[1])
 easy_stim = np.nanmax(f_condition1[0][:,3:12],1)
 easy_stim = easy_stim[~np.isnan(easy_stim)]
 perf = ongoing_performance(np.searchsorted(easy_raw, easy))
 plt.scatter(perf,easy_stim)
+stats.pearsonr(perf,easy_stim)
+
 
 # overall Performance fand feedback gcamp
 easy_raw = np.where(signed_contrast >= 0.5)[0]
@@ -376,7 +394,7 @@ correct = np.where(feedback == 1)[0]
 easy = np.intersect1d(easy_raw, correct)
 f_condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)
 F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), (len(f_condition1[0]), 1))
-f_condition1 = (condition1[0]-F1, condition1[1])
+f_condition1 = (f_condition1[0]-F1, f_condition1[1])
 easy_stim = np.nanmax(f_condition1[0][:,3:12],1)
 easy_stim = easy_stim[~np.isnan(easy_stim)]
 perf = ongoing_performance(feedback)
