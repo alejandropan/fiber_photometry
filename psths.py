@@ -22,31 +22,56 @@ r_trials = np.nan_to_num(right_trials)
 signed_contrast = r_trials - l_trials
 feedback = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.feedbackType.npy')
 
-#Delete before first trial and last trial
-
-fluo_times_s = np.delete(fluo_times,np.where(fluo_times < cue_times[0]))
-nacc_s = np.delete(nacc,np.where(fluo_times < cue_times[0]))
-fluo_times_f = np.delete(fluo_times_s,np.where(fluo_times_s > cue_times[-1]))
-nacc_f = np.delete(nacc_s,np.where(fluo_times_s > cue_times[-1]))
-nacc_f = stats.zscore(nacc_f)
-
-fluo_in_trials = []
-fluo_time_in_trials = []
-for i in range(len(cue_times)): 
-    # Get from 0.3 before
-    if i == len(cue_times) -1 :
-        fluo_in_trials.append(nacc_f[(fluo_times_f 
-                                 >= cue_times[i])])
-        fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
-                                 >= cue_times[i])])
+def bleach_correct(fluo_times, avg_window = 60):
+    '''
+    Correct for bleaching of gcamp across the session. Calculates
+    DF/F
     
-    else:
-        fluo_in_trials.append(nacc_f[(fluo_times_f 
-                                     >= cue_times[i]) & 
-               (fluo_times_f <= cue_times[i+1])])
-        fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
-                                     >= cue_times[i]) & 
-               (fluo_times_f <= cue_times[i+1])])
+    Parameters
+    ----------
+    fluo_times: alf file with times for fluorescence frames
+    avg_window: time for sliding window to calculate F value
+    
+    '''
+    
+
+
+#Delete before first trial and last trial
+def divide_in_trials(fluo_times, cue_times, nacc):
+    '''
+    Makes list of list with fluorescnece and timestamps divided by trials
+    
+    Parameters
+    ----------
+    
+    Fluo_times: alf file with times for fluorescence frames
+    cue_times:  alf file with times for cue (the start of the trial)
+    nacc: alf file with fluorescence values for the area of interest
+    '''
+    fluo_times_s = np.delete(fluo_times,np.where(fluo_times < cue_times[0]))
+    nacc_s = np.delete(nacc,np.where(fluo_times < cue_times[0]))
+    fluo_times_f = np.delete(fluo_times_s,np.where(fluo_times_s > cue_times[-1]))
+    nacc_f = np.delete(nacc_s,np.where(fluo_times_s > cue_times[-1]))
+    nacc_f = stats.zscore(nacc_f)
+    
+    fluo_in_trials = []
+    fluo_time_in_trials = []
+    for i in range(len(cue_times)): 
+        # Get from 0.3 before
+        if i == len(cue_times) -1 :
+            fluo_in_trials.append(nacc_f[(fluo_times_f 
+                                     >= cue_times[i] - 0.3)])
+            fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
+                                     >= cue_times[i] - 0.3)])
+        
+        else:
+            fluo_in_trials.append(nacc_f[(fluo_times_f 
+                                         >= cue_times[i] - 0.3) & 
+                   (fluo_times_f <= cue_times[i+1])])
+            fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
+                                         >= cue_times[i] - 0.3) & 
+                   (fluo_times_f <= cue_times[i+1])])
+    return fluo_in_trials, fluo_time_in_trials
 
 
 
@@ -113,6 +138,11 @@ def plot_psth(condition1):
     plt.xlabel('time(s)')
     plt.ylabel('F z-score')
 
+
+
+
+
+### Formal analysis ####
 
 
 # psth easy vs hard correct trials  stim and feedback
@@ -238,9 +268,134 @@ plot_psth(condition2)
 
 
 # Ratio Fedback stim
+easy = np.where(signed_contrast >= 0.5)[0]
+hard = np.where(signed_contrast <= 0.125)[0]
+correct = np.where(feedback == 1)[0]
+easy = np.intersect1d(easy, correct)
+hard = np.intersect1d(hard, correct)
+condition1 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy)
+condition2 = fp_psth(fluo_time_in_trials, cue_times, trial_list = hard)
+F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+condition1 = (condition1[0]-F1, condition1[1])
+condition2 = (condition2[0]-F2, condition2[1])
 
-stim = np.nanmax(fp_psth(fluo_time_in_trials, cue_times,
-                         trial_list = easy)[0],1)
-feedback = np.nanmax(fp_psth(fluo_time_in_trials, feedback_times, 
-                             trial_list = easy)[0],1)
-rpe_ratio = np.dropna(feedback/stim)
+
+f_condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)
+f_condition2 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = hard)
+F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), (len(f_condition1[0]), 1))
+F2 = np.reshape(np.nanmean(f_condition2[0][:,0:3],1), (len(f_condition2[0]), 1))
+f_condition1 = (condition1[0]-F1, condition1[1])
+f_condition2 = (condition2[0]-F2, condition2[1])
+
+
+easy_stim = np.nanmax(condition1[0][:,3:12],1)
+easy_stim = easy_stim[~np.isnan(easy_stim)]
+easy_feedback = np.nanmax(f_condition1[0][:,3:12],1)
+easy_feedback = easy_feedback[~np.isnan(easy_feedback)]
+hard_stim = np.nanmax(condition2[0][:,3:12],1)
+hard_stim = hard_stim[~np.isnan(hard_stim)]
+hard_feedback = np.nanmax(f_condition2[0][:,3:12],1)
+hard_feedback = hard_feedback[~np.isnan(hard_feedback)]
+
+for i in range(len(easy_stim)):
+    plt.plot([1,2],[easy_stim[i],easy_feedback[i]])
+    
+for i in range(len(hard_stim)):
+    plt.plot([1,2],[hard_stim[i],hard_feedback[i]])
+
+
+bars_easy = [np.mean(easy_stim), np.mean(easy_feedback)]
+err_easy = [stats.sem(easy_stim), stats.sem(easy_feedback)]
+plt.bar(['stim', 'feedback'], bars_easy, yerr=err_easy)
+
+bars_hard = [np.mean(hard_stim), np.mean(hard_feedback)]
+err_hard = [stats.sem(hard_stim), stats.sem(hard_feedback)]
+plt.bar(['stim', 'feedback'], bars_hard, yerr=err_hard)
+
+## Performance in bins with ratio
+
+
+easy = np.where(signed_contrast >= 0.5)[0]
+hard = np.where(signed_contrast <= 0.125)[0]
+condition1 = fp_psth(fluo_time_in_trials, cue_times, trial_list = easy)
+condition2 = fp_psth(fluo_time_in_trials, cue_times, trial_list = hard)
+F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+condition1 = (condition1[0]-F1, condition1[1])
+condition2 = (condition2[0]-F2, condition2[1])
+
+
+f_condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)
+f_condition2 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = hard)
+F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), (len(f_condition1[0]), 1))
+F2 = np.reshape(np.nanmean(f_condition2[0][:,0:3],1), (len(f_condition2[0]), 1))
+f_condition1 = (condition1[0]-F1, condition1[1])
+f_condition2 = (condition2[0]-F2, condition2[1])
+
+easy_stim = np.nanmax(condition1[0][:,3:12],1)
+easy_stim = easy_stim[~np.isnan(easy_stim)]
+easy_feedback = np.nanmax(f_condition1[0][:,3:12],1)
+easy_feedback = easy_feedback[~np.isnan(easy_feedback)]
+hard_stim = np.nanmax(condition2[0][:,3:12],1)
+hard_stim = hard_stim[~np.isnan(hard_stim)]
+hard_feedback = np.nanmax(f_condition2[0][:,3:12],1)
+hard_feedback = hard_feedback[~np.isnan(hard_feedback)]
+
+# Cumulative performance
+def ongoing_performance(feedback): 
+    cum_perf = np.empty(len(feedback))
+    cum_perf[:] = np.nan
+    for i in range(len(feedback)):
+        if np.isnan(feedback[i]):
+            continue
+        else:
+            if i == 0:
+                cum_perf[i] = feedback[i]
+            else:
+                cum_perf[i] = feedback[i] + cum_perf[i-1]
+    perf = cum_perf/(np.arange(len(cum_perf))+1)
+    return perf
+
+
+# Performance for that contrast and feedback gcamp for correct
+easy_raw = np.where(signed_contrast >= 0.5)[0]
+correct = np.where(feedback == 1)[0]
+easy = np.intersect1d(easy_raw, correct)
+f_condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)
+F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), (len(f_condition1[0]), 1))
+f_condition1 = (condition1[0]-F1, condition1[1])
+easy_stim = np.nanmax(f_condition1[0][:,3:12],1)
+easy_stim = easy_stim[~np.isnan(easy_stim)]
+perf = ongoing_performance(np.searchsorted(easy_raw, easy))
+plt.scatter(perf,easy_stim)
+
+# overall Performance fand feedback gcamp
+easy_raw = np.where(signed_contrast >= 0.5)[0]
+correct = np.where(feedback == 1)[0]
+easy = np.intersect1d(easy_raw, correct)
+f_condition1 = fp_psth(fluo_time_in_trials, feedback_times, trial_list = easy)
+F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), (len(f_condition1[0]), 1))
+f_condition1 = (condition1[0]-F1, condition1[1])
+easy_stim = np.nanmax(f_condition1[0][:,3:12],1)
+easy_stim = easy_stim[~np.isnan(easy_stim)]
+perf = ongoing_performance(feedback)
+plt.scatter(perf[easy],easy_stim)
+stats.pearsonr(perf[easy],easy_stim)
+
+
+# overall Performance fand feedback gcamp for correct
+for i in range(len(easy_stim)):
+    plt.plot([1,2],[easy_stim[i],easy_feedback[i]])
+    
+for i in range(len(hard_stim)):
+    plt.plot([1,2],[hard_stim[i],hard_feedback[i]])
+
+
+bars_easy = [np.mean(easy_stim), np.mean(easy_feedback)]
+err_easy = [stats.sem(easy_stim), stats.sem(easy_feedback)]
+plt.bar(['stim', 'feedback'], bars_easy, yerr=err_easy)
+
+bars_hard = [np.mean(hard_stim), np.mean(hard_feedback)]
+err_hard = [stats.sem(hard_stim), stats.sem(hard_feedback)]
+plt.bar(['stim', 'feedback'], bars_hard, yerr=err_hard)
