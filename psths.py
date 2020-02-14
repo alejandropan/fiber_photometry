@@ -315,8 +315,13 @@ def ongoing_performance(feedback):
 
 
 # Performance for that contrast and feedback gcamp for correct
-def expectation_gcamp_response(signed_contrast,feedback,
-                               fluo_time_in_trials, fluo_in_trials):
+def contrast_expectation_gcamp_response(signed_contrast,feedback,
+                               fluo_time_in_trials, 
+                               fluo_in_trials,
+                               feedback_times):
+    '''
+    feedback times is just wathever epoch you want, it should be called 'epoch'
+    '''
     easy_raw = np.where(signed_contrast >= 0.5)[0]
     correct = np.where(feedback == 1)[0]
     easy = np.intersect1d(easy_raw, correct)
@@ -331,27 +336,36 @@ def expectation_gcamp_response(signed_contrast,feedback,
     
     sig = stats.pearsonr(perf,easy_stim)
     
-    fig, ax = plt.subplots(1,2, figsize=(15,10))
-    plt.sca(ax[0])
-    ax[0].set_title('Easy',fontsize=25)
-    plt.scatter(perf,easy_stim)
+    fig, ax = plt.subplots(1, figsize=(15,10))
+    plt.sca(ax)
+    ax.set_title('Gcamp_expectation_for_contrast',fontsize=25)
+    plt.scatter(perf,easy_stim, c ='k')
+    plt.plot(np.unique(perf), np.poly1d(np.polyfit(perf, easy_stim, 1))(np.unique(perf)))
+    plt.xlabel('Reward Expectation', fontsize=25)
+    plt.ylabel('Reward cue DF/F',fontsize=25)
+    plt.legend(sig)
+
     return sig
 
 
 # overall Performance fand feedback gcamp
-easy_raw = np.where(signed_contrast >= 0.5)[0]
-correct = np.where(feedback == 1)[0]
-easy = np.intersect1d(easy_raw, correct)
-f_condition1 = fp_psth(fluo_time_in_trials, 
-                       feedback_times, trial_list = easy)
-F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), 
-                (len(f_condition1[0]), 1))
-f_condition1 = (f_condition1[0]-F1, f_condition1[1])
-easy_stim = np.nanmax(f_condition1[0][:,3:12],1)
-easy_stim = easy_stim[~np.isnan(easy_stim)]
-perf = ongoing_performance(feedback)
-plt.scatter(perf[easy],easy_stim)
-stats.pearsonr(perf[easy],easy_stim)
+
+def contrast_expectation_gcamp_response(signed_contrast,feedback,
+                               fluo_time_in_trials, fluo_in_trials,feedback_times):    
+    easy_raw = np.where(signed_contrast >= 0.5)[0]
+    correct = np.where(feedback == 1)[0]
+    easy = np.intersect1d(easy_raw, correct)
+    f_condition1 = fp_psth(fluo_time_in_trials, fluo_in_trials,
+                           feedback_times, trial_list = easy)
+    F1 = np.reshape(np.nanmean(f_condition1[0][:,0:3],1), 
+                    (len(f_condition1[0]), 1))
+    f_condition1 = (f_condition1[0]-F1, f_condition1[1])
+    easy_stim = np.nanmax(f_condition1[0][:,3:12],1)
+    easy_stim = easy_stim[~np.isnan(easy_stim)]
+    perf = ongoing_performance(feedback)
+    plt.scatter(perf[easy],easy_stim)
+    sig  = stats.pearsonr(perf[easy],easy_stim)
+    return sig
 
 
 
