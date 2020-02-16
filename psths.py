@@ -41,7 +41,7 @@ def bleach_correct(nacc, avg_window = 60):
     nacc_corrected = nacc/F
     return nacc_corrected
               
-def divide_in_trials(fluo_times, cue_times, nacc):
+def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.3):
     '''
     Makes list of list with fluorescnece and timestamps divided by trials
     
@@ -66,16 +66,16 @@ def divide_in_trials(fluo_times, cue_times, nacc):
         # Get from 0.3 before
         if i == len(cue_times) -1 :
             fluo_in_trials.append(nacc_f[(fluo_times_f 
-                                     >= cue_times[i] - 0.3)])
+                                     >= cue_times[i] - t_before_epoch)])
             fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
-                                     >= cue_times[i] - 0.3)])
+                                     >= cue_times[i] - t_before_epoch)])
         
         else:
             fluo_in_trials.append(nacc_f[(fluo_times_f 
-                                         >= cue_times[i] - 0.3) & 
+                                         >= cue_times[i] - t_before_epoch) & 
                    (fluo_times_f <= cue_times[i+1])])
             fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
-                                         >= cue_times[i] - 0.3) & 
+                                         >= cue_times[i] - t_before_epoch) & 
                    (fluo_times_f <= cue_times[i+1])])
     return fluo_in_trials, fluo_time_in_trials
 
@@ -143,7 +143,7 @@ def plot_psth(condition1):
 
 # psth easy vs hard correct trials  stim and feedback
 
-def easy_vs_hard(signed_contrast,feedback,fluo_time_in_trials, fluo_in_trials,
+def easy_vs_hard(signed_contrast,cue_times, feedback, feedback_times,fluo_time_in_trials, fluo_in_trials,
                  subtract_baseline =  True):
     '''
     Figure function plots Psth for stim and feedback from easy 
@@ -313,7 +313,6 @@ def ongoing_performance(feedback):
     
     return perf
 
-
 # Performance for that contrast and feedback gcamp for correct
 def contrast_expectation_gcamp_response(signed_contrast,feedback,
                                fluo_time_in_trials, 
@@ -347,9 +346,7 @@ def contrast_expectation_gcamp_response(signed_contrast,feedback,
 
     return sig
 
-
 # overall Performance fand feedback gcamp
-
 def contrast_expectation_gcamp_response(signed_contrast,feedback,
                                fluo_time_in_trials, fluo_in_trials,feedback_times):    
     easy_raw = np.where(signed_contrast >= 0.5)[0]
@@ -367,6 +364,7 @@ def contrast_expectation_gcamp_response(signed_contrast,feedback,
     sig  = stats.pearsonr(perf[easy],easy_stim)
     return sig
 
-
-
-
+condition1 = fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, trial_list = easy, t_range = [-0.5, 1.0])
+condition2 = fp_psth(fluo_time_in_trials, fluo_in_trials,  cue_times, trial_list = hard, t_range = [-0.5, 1.0])
+    
+# GLM predicting gcamp response from the different task events
