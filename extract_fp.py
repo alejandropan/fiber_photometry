@@ -35,6 +35,7 @@ def ssv_2_array(ssv_file, video_file, mode='fiber'):
     cap = cv2.VideoCapture(video_file)
     nframes = cap.get(cv2.CAP_PROP_FRAME_COUNT)
     ssv_file = ssv.loadf(ssv_file)
+    
     if mode == 'fiber':
         y = np.empty([int(nframes),4])
         for n,i in enumerate(ssv_file[0][0].split('\n')[:-1]): 
@@ -44,7 +45,12 @@ def ssv_2_array(ssv_file, video_file, mode='fiber'):
             # Convert date to unix date
             y[n,0] = r[0]
             y[n,1] = mktime(date.timetuple())*1e3 + date.microsecond/1e3
-            y[n,2:] = r[2:]
+            if len(r) == 2:
+                y[n,2:] = 0
+            if len(r) == 3:
+                y[n,3] = int(r[2])/12882
+            elif len(r) > 3:    
+                y[n,2:] = r[2:]
         
     elif mode == 'left':
         y = np.empty([int(nframes),3])
@@ -79,7 +85,6 @@ def extract_fp_time(session_path):
     camera_bpod = session_path + '/alf/' + '_ibl_leftCamera.times.npy'
     
     #First get path to different files
-    
     fiber = ssv_2_array(ssv_fiber, fiber_video)[:,1]
     camera = ssv_2_array(ssv_camera, left_video, mode='left')[:,1]
     camera_bpod = np.load(camera_bpod)   

@@ -14,17 +14,59 @@ import sklearn as sk
 
 # Input some data
 
-fluo_times = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_fluo.times.npy')
-nacc = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_loc2.fluo.npy')
-cue_times = np.load ('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.goCueTrigger_times.npy')
-response_times = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.response_times.npy')
-feedback_times = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.feedback_times.npy')
-left_trials = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.contrastLeft.npy')
-right_trials = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.contrastRight.npy')
-l_trials = np.nan_to_num(left_trials)
-r_trials = np.nan_to_num(right_trials)
-signed_contrast = r_trials - l_trials
-feedback = np.load('/Users/alex/Documents/Trial_dataset_fip1_FP/005/alf/_ibl_trials.feedbackType.npy')
+session = ['/Volumes/LaCie/subjects_personal_project/Subjects_personal_project/fip_2/2020-03-03/001'] 
+
+for i, ses in enumerate(session):
+    
+    if i == 0:
+        fluo_times = np.load(ses +'/alf/_ibl_fluo.times.npy')
+        nacc = np.load(ses +'/alf/_ibl_loc3.fluo.npy')
+        cue_times = np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')
+        response_times = np.load(ses +'/alf/_ibl_trials.response_times.npy')
+        feedback_times = np.load(ses +'/alf/_ibl_trials.feedback_times.npy')
+        left_trials = np.load(ses +'/alf/_ibl_trials.contrastLeft.npy')
+        right_trials = np.load(ses +'/alf/_ibl_trials.contrastRight.npy')
+        l_trials = np.nan_to_num(left_trials)
+        r_trials = np.nan_to_num(right_trials)
+        signed_contrast = r_trials - l_trials
+        feedback = np.load(ses + '/alf/_ibl_trials.feedbackType.npy')
+        nacc = bleach_correct(nacc, avg_window = 60)
+        fluo_in_trials, fluo_time_in_trials = divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1)
+        cue_times = cue_times[:-1]
+        response_times = response_times[:-1]
+        feedback_times = feedback_times[:-1]
+        l_trials = l_trials[:-1]
+        r_trials = r_trials[:-1]
+        signed_contrast = signed_contrast[:-1]
+        feedback = feedback[:-1]
+    elif i>0:
+        fluo_times_t = np.load(ses +'/alf/_ibl_fluo.times.npy')
+        cue_times_t = np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')
+        nacc_t = np.load(ses +'/alf/_ibl_loc3.fluo.npy')
+        nacc_t = bleach_correct(nacc_t, avg_window = 60)
+        fluo_in_trials_t, fluo_time_in_trials_t = divide_in_trials(fluo_times_t, cue_times_t, nacc_t, t_before_epoch = 0.1)
+        
+        fluo_times = np.append(fluo_times, np.load(ses +'/alf/_ibl_fluo.times.npy')[:-1])
+        nacc = np.append(nacc, np.load(ses +'/alf/_ibl_loc2.fluo.npy'))
+        cue_times = np.append(cue_times, np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')[:-1])
+        response_times = np.append(response_times, np.load(ses +'/alf/_ibl_trials.response_times.npy')[:-1])
+        feedback_times = np.append(feedback_times, np.load(ses +'/alf/_ibl_trials.feedback_times.npy')[:-1])
+        left_trials = np.load(ses +'/alf/_ibl_trials.contrastLeft.npy')
+        right_trials = np.load(ses +'/alf/_ibl_trials.contrastRight.npy')
+        l_trials = np.append(l_trials,np.nan_to_num(left_trials)[:-1])
+        r_trials = np.append(r_trials,np.nan_to_num(right_trials)[:-1])
+        signed_contrast = r_trials - l_trials
+        feedback = np.append(feedback, (np.load(ses + '/alf/_ibl_trials.feedbackType.npy')[:-1]))
+        fluo_in_trials.extend(fluo_in_trials_t)
+        fluo_time_in_trials.extend(fluo_time_in_trials_t)
+        
+
+
+
+# Note:  Remember to cut down last trial from above after running divide in trials
+
+
+
 
 
 def bleach_correct(nacc, avg_window = 60):
@@ -41,10 +83,10 @@ def bleach_correct(nacc, avg_window = 60):
     nacc_corrected = nacc/F
     return nacc_corrected
               
-def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.3):
+def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1):
     '''
     Makes list of list with fluorescnece and timestamps divided by trials
-    
+    Deletes last trial since it might be incomplte
     Parameters
     ----------
     
@@ -62,15 +104,8 @@ def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.3):
     
     fluo_in_trials = []
     fluo_time_in_trials = []
-    for i in range(len(cue_times)): 
+    for i in range(len(cue_times)-1): 
         # Get from 0.3 before
-        if i == len(cue_times) -1 :
-            fluo_in_trials.append(nacc_f[(fluo_times_f 
-                                     >= cue_times[i] - t_before_epoch)])
-            fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
-                                     >= cue_times[i] - t_before_epoch)])
-        
-        else:
             fluo_in_trials.append(nacc_f[(fluo_times_f 
                                          >= cue_times[i] - t_before_epoch) & 
                    (fluo_times_f <= cue_times[i+1])])
@@ -138,19 +173,21 @@ def plot_psth(condition1):
     plt.fill_between(x, y-error, y+error)
     plt.xlabel('time(s)',fontsize=25)
     plt.ylabel('DF/F z-score',fontsize=25)
+    plt.xticks(fontsize=25)
+    plt.yticks(fontsize=25)
 
 ### Formal analysis ####
 
 # psth easy vs hard correct trials  stim and feedback
 
 def easy_vs_hard(signed_contrast,cue_times, feedback, feedback_times,fluo_time_in_trials, fluo_in_trials,
-                 subtract_baseline =  True):
+                 subtract_baseline =  True, save = True):
     '''
     Figure function plots Psth for stim and feedback from easy 
     and hard trials
     '''
     easy = np.where(signed_contrast == 1)[0]
-    hard = np.where(signed_contrast == 0.125)[0]
+    hard = np.where(signed_contrast == 0.5)[0]
     correct = np.where(feedback == 1)[0]
     easy = np.intersect1d(easy, correct)
     hard = np.intersect1d(hard, correct)
@@ -165,7 +202,7 @@ def easy_vs_hard(signed_contrast,cue_times, feedback, feedback_times,fluo_time_i
         condition2 = (condition2[0]-F2, condition2[1])
     
     
-    fig, ax = plt.subplots(1,2, figsize=(15,10))
+    fig, ax = plt.subplots(1,2, figsize=(18,10), sharey=True)
     plt.sca(ax[0])
     ax[0].set_title('Go Cue', fontsize=25)
     plot_psth(condition1)
@@ -187,24 +224,24 @@ def easy_vs_hard(signed_contrast,cue_times, feedback, feedback_times,fluo_time_i
     plt.sca(ax[1])
     ax[1].set_title('Reward Cue', fontsize=25)
     plot_psth(condition1)
-    plot_psth(condition2) 
+    plot_psth(condition2)
+    if save == True:
+        fig.savefig('easyvshard.pdf')
 
-def ipsi_vs_contra(signed_contrast,feedback,fluo_time_in_trials, fluo_in_trials,
-                 subtract_baseline =  True):
+        
+
+def ipsi_vs_contra(signed_contrast,cue_times, feedback,fluo_time_in_trials, fluo_in_trials,
+                 subtract_baseline =  True, save = True):
     '''
     Figure function plots Psth for stim and feedback from easy 
     and hard trials
     '''
-    easy = np.where(signed_contrast == 1)[0]
-    hard = np.where(signed_contrast == 0.125)[0]
-    correct = np.where(feedback == 1)[0]
-    easy = np.intersect1d(easy, correct)
-    hard = np.intersect1d(hard, correct)
+
     easy_r = np.where(signed_contrast == 1)[0]
     easy_l = np.where(signed_contrast == -1)[0]
-    condition1 = fp_psth(fluo_time_in_trials, cue_times, 
+    condition1 = fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, 
                          trial_list = easy_r)
-    condition2 = fp_psth(fluo_time_in_trials, cue_times, 
+    condition2 = fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, 
                          trial_list = easy_l)
     
     if subtract_baseline ==  True:
@@ -223,9 +260,9 @@ def ipsi_vs_contra(signed_contrast,feedback,fluo_time_in_trials, fluo_in_trials,
 
     easy_r = np.where(signed_contrast == 1)[0]
     easy_l = np.where(signed_contrast == -1)[0]
-    condition1 = fp_psth(fluo_time_in_trials, feedback_times, 
+    condition1 = fp_psth(fluo_time_in_trials,fluo_in_trials, feedback_times, 
                          trial_list = easy_r)    
-    condition2 = fp_psth(fluo_time_in_trials, feedback_times, 
+    condition2 = fp_psth(fluo_time_in_trials, fluo_in_trials, feedback_times, 
                          trial_list = easy_l)    
     
     if subtract_baseline ==  True:
@@ -240,6 +277,9 @@ def ipsi_vs_contra(signed_contrast,feedback,fluo_time_in_trials, fluo_in_trials,
     ax[1].set_title('Reward Cue',fontsize=25)
     plot_psth(condition1)
     plot_psth(condition2)  
+    if save == True:
+        fig.savefig('ipsivscontra.pdf')
+
 
 def ratio_stim_feedback(signed_contrast, feedback, fluo_in_trials,
                         fluo_time_in_trials):
@@ -340,14 +380,14 @@ def contrast_expectation_gcamp_response(signed_contrast,feedback,
     ax.set_title('Gcamp_expectation_for_contrast',fontsize=25)
     plt.scatter(perf,easy_stim, c ='k')
     plt.plot(np.unique(perf), np.poly1d(np.polyfit(perf, easy_stim, 1))(np.unique(perf)))
-    plt.xlabel('Reward Expectation', fontsize=25)
+    plt.xlabel('Ongoing performance', fontsize=25)
     plt.ylabel('Reward cue DF/F',fontsize=25)
     plt.legend(sig)
 
     return sig
 
 # overall Performance fand feedback gcamp
-def contrast_expectation_gcamp_response(signed_contrast,feedback,
+def expectation_gcamp_response(signed_contrast,feedback,
                                fluo_time_in_trials, fluo_in_trials,feedback_times):    
     easy_raw = np.where(signed_contrast >= 0.5)[0]
     correct = np.where(feedback == 1)[0]
@@ -364,7 +404,61 @@ def contrast_expectation_gcamp_response(signed_contrast,feedback,
     sig  = stats.pearsonr(perf[easy],easy_stim)
     return sig
 
-condition1 = fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, trial_list = easy, t_range = [-0.5, 1.0])
-condition2 = fp_psth(fluo_time_in_trials, fluo_in_trials,  cue_times, trial_list = hard, t_range = [-0.5, 1.0])
+
+def after_error_correct(signed_contrast, cue_times, feedback, feedback_times,fluo_time_in_trials, fluo_in_trials,
+                 subtract_baseline =  True, save = True):
+    '''
+    Figure function plots Psth for stim and feedback from easy 
+    and hard trials
+    '''
     
-# GLM predicting gcamp response from the different task events
+    noevidence = np.where(signed_contrast == 0)[0]
+    correct = np.where(feedback == 1)[0]
+    incorrect = np.where(feedback == -1)[0]
+    after_correct = correct + 1
+    after_incorrect = incorrect + 1
+    noevidence_after_correct = np.intersect1d(noevidence, after_correct)
+    noevidence_after_incorrect = np.intersect1d(noevidence, after_incorrect)
+
+    
+    condition1 = fp_psth(fluo_time_in_trials, fluo_in_trials,
+                           cue_times, trial_list = after_correct[:-1], plot = False)
+
+    condition2 = fp_psth(fluo_time_in_trials, fluo_in_trials,
+                           cue_times, trial_list =  after_incorrect[:-1], plot= False)
+
+
+    
+    if subtract_baseline ==  True:
+        F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+        F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+        condition1 = (condition1[0]-F1, condition1[1])
+        condition2 = (condition2[0]-F2, condition2[1])
+    
+    
+    fig, ax = plt.subplots(1,2, figsize=(20,10))
+    plt.sca(ax[0])
+    ax[0].set_title('Go Cue all trials', fontsize=25)
+    plot_psth(condition1)
+    plot_psth(condition2)
+    
+    condition1 = fp_psth(fluo_time_in_trials, fluo_in_trials,
+                           cue_times, trial_list = noevidence_after_correct[:-1], plot = False)
+
+    condition2 = fp_psth(fluo_time_in_trials, fluo_in_trials,
+                           cue_times, trial_list =  noevidence_after_incorrect[:-1], plot= False)
+
+    
+    if subtract_baseline ==  True:
+        F1 = np.reshape(np.nanmean(condition1[0][:,0:3],1), (len(condition1[0]), 1))
+        F2 = np.reshape(np.nanmean(condition2[0][:,0:3],1), (len(condition2[0]), 1))
+        condition1 = (condition1[0]-F1, condition1[1])
+        condition2 = (condition2[0]-F2, condition2[1])
+    
+    plt.sca(ax[1])
+    ax[1].set_title('Go Cue 0% contrast trials', fontsize=25)
+    plot_psth(condition1)
+    plot_psth(condition2)
+    
+    if save == True:
+        fig.savefig('after_error_correct_0.pdf')
