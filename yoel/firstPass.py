@@ -4,6 +4,22 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 dp = "/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-01-16/001/alf/"
+base_path = "/jukebox/witten/Alex/Session_slection_fp_pilot"
+
+def get_paths(base_path):
+    unfiltered_paths_gen = os.walk(base_path, topdown=True)
+    filtered_paths, fip_names = [], []
+    for pset in unfiltered_paths_gen:
+	for item in pset:
+	    if "fip_" and "2020-" and "alf" in item and isinstance(item, str):
+		fip_names.append(item.split("/")[-4])
+		filtered_paths.append(item)
+    fip_names = np.unique(fip_names)
+    fips = {f:[] for f in np.unique(fip_names)}
+    for item in filtered_paths:
+	fips[item.split("/")[-4]].append(item)
+    return filtered_paths, fips
+
 
 def load_data(base_path):
     files = [os.path.join(base_path, x) for x in os.listdir(base_path)
@@ -47,24 +63,10 @@ def avgAcc(data):
 # write a function to automatically read in the correct paths,
 # this won't work when data set grows
 # THIS IS FOR PLOTTING AVG ACC ACROSS SESSIONS
-sessPathsFIP1 = [
-"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-01-16/001/alf",	
-"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-01-17/001/alf",
-"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-01-24/016/alf",
-"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-02-20/001/alf",
-"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-02-24/001/alf",
-"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_1/2020-02-25/002/alf"
-]
+path_info = get_paths(base_path)
+accs = {key:0 for key in path_info.keys()}
 
-sessPathsFIP2 = [
-	"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_2/2020-02-03/001/alf",
-	"/jukebox/witten/Alex/Session_slection_fp_pilot/fip_2/2020-03-03/001/alf"
-]
-avg_accsf1 = np.zeros(len(sessPathsFIP1))
-avg_accsf2 = np.zeros(len(sessPathsFIP2))
-accs = {"FIP1":0, "FIP2":0}
-
-for fname, pathset in [("FIP1", sessPathsFIP1), ("FIP2", sessPathsFIP2)]:
+for fname, pathset in path_info.items():
     accs[fname] = np.zeros(len(pathset))
     for idx, path in enumerate(pathset):
         data = load_data(path)
@@ -96,9 +98,9 @@ def avgRewardGivenPredictor(reward_vol, side_contrast):
 
 # this averages the fluoresence within rewarded trials and returns 
 # an array of those averages
-def avgFluoGivenReward(reward_vol, fluo_data):
+def avgFluoGivenReward(reward_vol, fluo_data, r_val):
     # get indices of rewarded trials
-    ridx = np.where(reward_vol == 3)[0]
+    ridx = np.where(reward_vol == r_val)[0]
     avg_fluo_r = np.zeros(len(ridx))
     for a_idx, r_idx in enumerate(ridx):
 	avg_fluo_r[a_idx] = fluo_data[r_idx].mean()
