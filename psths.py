@@ -5,7 +5,6 @@ Created on Mon Feb 10 13:21:16 2020
 
 @author: alex
 """
-
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy import stats
@@ -13,54 +12,60 @@ import sklearn as sk
 
 
 # Input some data
-
-session = ['/Volumes/LaCie/subjects_personal_project/Subjects_personal_project/fip_2/2020-03-03/001'] 
-
-for i, ses in enumerate(session):
-    
-    if i == 0:
-        fluo_times = np.load(ses +'/alf/_ibl_fluo.times.npy')
-        nacc = np.load(ses +'/alf/_ibl_loc3.fluo.npy')
-        cue_times = np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')
-        response_times = np.load(ses +'/alf/_ibl_trials.response_times.npy')
-        feedback_times = np.load(ses +'/alf/_ibl_trials.feedback_times.npy')
-        left_trials = np.load(ses +'/alf/_ibl_trials.contrastLeft.npy')
-        right_trials = np.load(ses +'/alf/_ibl_trials.contrastRight.npy')
-        l_trials = np.nan_to_num(left_trials)
-        r_trials = np.nan_to_num(right_trials)
-        signed_contrast = r_trials - l_trials
-        feedback = np.load(ses + '/alf/_ibl_trials.feedbackType.npy')
-        nacc = bleach_correct(nacc, avg_window = 60)
-        fluo_in_trials, fluo_time_in_trials = divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1)
-        cue_times = cue_times[:-1]
-        response_times = response_times[:-1]
-        feedback_times = feedback_times[:-1]
-        l_trials = l_trials[:-1]
-        r_trials = r_trials[:-1]
-        signed_contrast = signed_contrast[:-1]
-        feedback = feedback[:-1]
-    elif i>0:
-        fluo_times_t = np.load(ses +'/alf/_ibl_fluo.times.npy')
-        cue_times_t = np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')
-        nacc_t = np.load(ses +'/alf/_ibl_loc3.fluo.npy')
-        nacc_t = bleach_correct(nacc_t, avg_window = 60)
-        fluo_in_trials_t, fluo_time_in_trials_t = divide_in_trials(fluo_times_t, cue_times_t, nacc_t, t_before_epoch = 0.1)
-        
-        fluo_times = np.append(fluo_times, np.load(ses +'/alf/_ibl_fluo.times.npy')[:-1])
-        nacc = np.append(nacc, np.load(ses +'/alf/_ibl_loc2.fluo.npy'))
-        cue_times = np.append(cue_times, np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')[:-1])
-        response_times = np.append(response_times, np.load(ses +'/alf/_ibl_trials.response_times.npy')[:-1])
-        feedback_times = np.append(feedback_times, np.load(ses +'/alf/_ibl_trials.feedback_times.npy')[:-1])
-        left_trials = np.load(ses +'/alf/_ibl_trials.contrastLeft.npy')
-        right_trials = np.load(ses +'/alf/_ibl_trials.contrastRight.npy')
-        l_trials = np.append(l_trials,np.nan_to_num(left_trials)[:-1])
-        r_trials = np.append(r_trials,np.nan_to_num(right_trials)[:-1])
-        signed_contrast = r_trials - l_trials
-        feedback = np.append(feedback, (np.load(ses + '/alf/_ibl_trials.feedbackType.npy')[:-1]))
-        fluo_in_trials.extend(fluo_in_trials_t)
-        fluo_time_in_trials.extend(fluo_time_in_trials_t)
-        
-
+#
+#session = ['/Volumes/LaCie/subjects_personal_project/Subjects_personal_project/fip_2/2020-03-03/001'] 
+#session = ["/mnt/bucket/labs/witten/yoel/iblfp_processed/fip_1/2020-03-11/001"]
+#
+#basePath = "mnt/bucket/labs/witten/yoel/iblfp_processed/"
+#N = 3
+#fips = ["fip_{}".format(i+1) for i in range(N)]
+#
+#
+#for i, ses in enumerate(session):
+#    
+#    if i == 0:
+#        fluo_times = np.load(ses +'/alf/_ibl_fluo.times.npy')
+#        nacc = np.load(ses +'/alf/_ibl_loc3.fluo.npy')
+#        cue_times = np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')
+#        response_times = np.load(ses +'/alf/_ibl_trials.response_times.npy')
+#        feedback_times = np.load(ses +'/alf/_ibl_trials.feedback_times.npy')
+#        left_trials = np.load(ses +'/alf/_ibl_trials.contrastLeft.npy')
+#        right_trials = np.load(ses +'/alf/_ibl_trials.contrastRight.npy')
+#        l_trials = np.nan_to_num(left_trials)
+#        r_trials = np.nan_to_num(right_trials)
+#        signed_contrast = r_trials - l_trials
+#        feedback = np.load(ses + '/alf/_ibl_trials.feedbackType.npy')
+#        nacc = bleach_correct(nacc, avg_window = 60)
+#        fluo_in_trials, fluo_time_in_trials = divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1)
+#        cue_times = cue_times[:-1]
+#        response_times = response_times[:-1]
+#        feedback_times = feedback_times[:-1]
+#        l_trials = l_trials[:-1]
+#        r_trials = r_trials[:-1]
+#        signed_contrast = signed_contrast[:-1]
+#        feedback = feedback[:-1]
+#    elif i>0:
+#        fluo_times_t = np.load(ses +'/alf/_ibl_fluo.times.npy')
+#        cue_times_t = np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')
+#        nacc_t = np.load(ses +'/alf/_ibl_loc3.fluo.npy')
+#        nacc_t = bleach_correct(nacc_t, avg_window = 60)
+#        fluo_in_trials_t, fluo_time_in_trials_t = divide_in_trials(fluo_times_t, cue_times_t, nacc_t, t_before_epoch = 0.1)
+#        
+#        fluo_times = np.append(fluo_times, np.load(ses +'/alf/_ibl_fluo.times.npy')[:-1])
+#        nacc = np.append(nacc, np.load(ses +'/alf/_ibl_loc2.fluo.npy'))
+#        cue_times = np.append(cue_times, np.load (ses +'/alf/_ibl_trials.goCueTrigger_times.npy')[:-1])
+#        response_times = np.append(response_times, np.load(ses +'/alf/_ibl_trials.response_times.npy')[:-1])
+#        feedback_times = np.append(feedback_times, np.load(ses +'/alf/_ibl_trials.feedback_times.npy')[:-1])
+#        left_trials = np.load(ses +'/alf/_ibl_trials.contrastLeft.npy')
+#        right_trials = np.load(ses +'/alf/_ibl_trials.contrastRight.npy')
+#        l_trials = np.append(l_trials,np.nan_to_num(left_trials)[:-1])
+#        r_trials = np.append(r_trials,np.nan_to_num(right_trials)[:-1])
+#        signed_contrast = r_trials - l_trials
+#        feedback = np.append(feedback, (np.load(ses + '/alf/_ibl_trials.feedbackType.npy')[:-1]))
+#        fluo_in_trials.extend(fluo_in_trials_t)
+#        fluo_time_in_trials.extend(fluo_time_in_trials_t)
+#        
+#
 
 
 # Note:  Remember to cut down last trial from above after running divide in trials
@@ -69,7 +74,7 @@ for i, ses in enumerate(session):
 
 
 
-def bleach_correct(nacc, avg_window = 60):
+def bleach_correct(neural_data, avg_window = 60):
     '''
     Correct for bleaching of gcamp across the session. Calculates
     DF/F
@@ -79,11 +84,10 @@ def bleach_correct(nacc, avg_window = 60):
     avg_window: time for sliding window to calculate F value
     '''
     # First calculate sliding window
-    F = np.convolve(nacc, np.ones((avg_window,))/avg_window, mode='same')
-    nacc_corrected = nacc/F
-    return nacc_corrected
+    F = np.convolve(neural_data, np.ones((avg_window,))/avg_window, mode='same')
+    return neural_data / F
               
-def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1):
+def divide_in_trials(fluo_times, cue_times, neural_data, t_before_epoch = 0.1):
     '''
     Makes list of list with fluorescnece and timestamps divided by trials
     Deletes last trial since it might be incomplte
@@ -97,25 +101,31 @@ def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1):
     #Delete before first trial and last trial
 
     fluo_times_s = np.delete(fluo_times,np.where(fluo_times < cue_times[0]))
-    nacc_s = np.delete(nacc,np.where(fluo_times < cue_times[0]))
-    fluo_times_f = np.delete(fluo_times_s,np.where(fluo_times_s > cue_times[-1]))
-    nacc_f = np.delete(nacc_s,np.where(fluo_times_s > cue_times[-1]))
-    nacc_f = stats.zscore(nacc_f)
-    
+    neural_data_s = np.delete(neural_data, np.where(fluo_times < cue_times[0]))
+    fluo_times_f = np.delete(fluo_times_s, np.where(fluo_times_s > cue_times[-1]))
+    neural_data_f = np.delete(neural_data_s, np.where(fluo_times_s > cue_times[-1]))
+    neural_data_f = stats.zscore(neural_data_f)
     fluo_in_trials = []
     fluo_time_in_trials = []
+
     for i in range(len(cue_times)-1): 
         # Get from 0.3 before
-            fluo_in_trials.append(nacc_f[(fluo_times_f 
+        fluo_in_trials.append(neural_data_f[(fluo_times_f 
                                          >= cue_times[i] - t_before_epoch) & 
                    (fluo_times_f <= cue_times[i+1])])
-            fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
+        fluo_time_in_trials.append(fluo_times_f[(fluo_times_f 
                                          >= cue_times[i] - t_before_epoch) & 
                    (fluo_times_f <= cue_times[i+1])])
+
     return fluo_in_trials, fluo_time_in_trials
 
-def fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, trial_list = np.arange(len(cue_times)),
-            t_range = [-0.1, 1.0], T_BIN = 0.03, plot = False):
+#def fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, trial_list = np.arange(len(cue_times)),
+#            t_range = [-0.1, 1.0], T_BIN = 0.03, plot = False):
+def fp_psth(fluo_time_in_trials, 
+	    fluo_in_trials, 
+	    cue_times,
+	    t_range = [-0.1, 1.0], T_BIN = 0.03, plot = False):
+
     '''
 
     Parameters
@@ -137,7 +147,7 @@ def fp_psth(fluo_time_in_trials, fluo_in_trials, cue_times, trial_list = np.aran
     x: x-axis with bin times
 
     '''
-    
+    trial_list = np.arange(len(cue_times))    
     # Binned array with fluorescence values
     bins_len = round((t_range[1] - t_range[0])/T_BIN)
     bins = np.arange(t_range[0], t_range[1], T_BIN)
