@@ -69,18 +69,20 @@ for i, ses in enumerate(session):
 
 
 
-def bleach_correct(nacc, avg_window = 60):
+def bleach_correct(nacc, avg_window = 60, frame_rate = 30):
     '''
     Correct for bleaching of gcamp across the session. Calculates
     DF/F
     Parameters
     ----------
     nacc: alf file with fluorescence values for the area of interest
-    avg_window: time for sliding window to calculate F value
+    avg_window: time for sliding window to calculate F value in frame
+    frame_rate = frame rate in Hz
     '''
     # First calculate sliding window
+    avg_window = int(avg_window*(1000/frame_rate))
     F = np.convolve(nacc, np.ones((avg_window,))/avg_window, mode='same')
-    nacc_corrected = nacc/F
+    nacc_corrected = (nacc - F)/F
     return nacc_corrected
               
 def divide_in_trials(fluo_times, cue_times, nacc, t_before_epoch = 0.1):
