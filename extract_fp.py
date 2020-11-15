@@ -52,7 +52,7 @@ def ssv_2_array(ssv_file, video_file, mode='fiber'):
                 y[n,2:] = r[2:]
         
     elif mode == 'left':
-        y = np.empty([len(sv_file[0][0].split('\n')[:-1]),3])
+        y = np.empty([len(ssv_file[0][0].split('\n')[:-1]),3])
         for n,i in enumerate(ssv_file[0][0].split('\n')[:-1]): 
             j = i.split(" ")
             date = dateutil.parser.parse(j[1])
