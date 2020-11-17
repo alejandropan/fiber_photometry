@@ -63,6 +63,7 @@ def ssv_2_array(ssv_file, video_file, mode='fiber'):
     return y
 
 
+
 def extract_fp_time(session_path):
     '''
     Obtain bpod times for fp signals
@@ -85,19 +86,17 @@ def extract_fp_time(session_path):
     fiber = ssv_2_array(ssv_fiber, fiber_video)[:,1]
     camera = ssv_2_array(ssv_camera, left_video, mode='left')[:,1]
     camera_bpod = np.load(camera_bpod)   
-    # First calculate fiber times in relation to left camera time
-    skip = abs(len(fiber) - len(camera))
-    if (len(fiber) - len(camera))<0:
-        fp_leftcamtime = fiber - camera[skip:]
-        # msec to sec
-        fp_leftcamtime = fp_leftcamtime/1000
-        fp_bpodtime = fp_leftcamtime + camera_bpod[skip:]
-    else:
-        fp_leftcamtime = fiber[skip:] - camera
-        # msec to sec
-        fp_leftcamtime = fp_leftcamtime/1000
-        fp_bpodtime = fp_leftcamtime + camera_bpod
-   
+    assert len(camera_bpod) == len(camera)
+    # Find closes camera timestamps based on the PC
+    idx = np.empty(len(fiber))
+    for i, j in enumerate(fiber):
+        diff = abs(camera - j)
+        idx[i] = np.where(diff == min(diff))[0][0]
+    
+    
+    fp_bpodtime = camera_bpod[idx.astype(int)] + (np.mean(np.diff(fiber))/1000)
+    fp_offset = fiber - camera[idx.astype(int)]
+    fp_bpodtime = camera_bpod[idx.astype(int)] + (fp_offset/1000)
     # Then calibrate to bpod time
     # Save times
     fpath = Path(session_path).joinpath('alf', '_ibl_fluo.times.npy') 
@@ -151,14 +150,6 @@ def extract_fp_fluorescence(session_path):
     avg_loc3 = loc3[:,3] - avg_noise
     avg_loc4 = loc4[:,3] - avg_noise
     
-    
-    if (len(fiber) - len(camera))>0:
-        avg_loc1 = avg_loc1[skip:]
-        avg_loc2 = avg_loc2[skip:]
-        avg_loc3 = avg_loc3[skip:]
-        avg_loc4 = avg_loc4[skip:]
-    
-        
     # Save everything
     fpath = Path(session_path).joinpath('alf', '_ibl_noise.fluo.npy') 
     np.save(fpath, avg_noise)
@@ -171,8 +162,7 @@ def extract_fp_fluorescence(session_path):
     fpath = Path(session_path).joinpath('alf', '_ibl_loc4.fluo.npy') 
     np.save(fpath, avg_loc4)
     
-    return avg_noise, avg_loc1, avg_loc2, avg_loc3, avg_loc4
-
+    return avg_noise, avg_loc1, avg_loc2, avg_loc3, avg_lo
 
 
 
