@@ -64,45 +64,6 @@ def ssv_2_array(ssv_file, video_file, mode='fiber'):
 
 
 
-def extract_fp_time(session_path):
-    '''
-    Obtain bpod times for fp signals
-    
-    Parameters
-    ----------
-    session_path : string with session path
-    Returns
-    -------
-    fp_bpodtime : times of fiber frames in bpod time
-    '''
-    # Get paths
-    ssv_fiber = session_path + '/raw_video_data/' + '_iblrig_fiberCamera.timestamps.ssv'
-    ssv_camera = session_path + '/raw_video_data/' + '_iblrig_leftCamera.timestamps.ssv'
-    fiber_video = session_path + '/raw_video_data/' + '_iblrig_fiberCamera.raw.mp4'
-    left_video = session_path + '/raw_video_data/' + '_iblrig_leftCamera.raw.mp4'
-    camera_bpod = session_path + '/alf/' + '_ibl_leftCamera.times.npy'
-    
-    #First get path to different files
-    fiber = ssv_2_array(ssv_fiber, fiber_video)[:,1]
-    camera = ssv_2_array(ssv_camera, left_video, mode='left')[:,1]
-    camera_bpod = np.load(camera_bpod)   
-    assert len(camera_bpod) == len(camera)
-    # Find closes camera timestamps based on the PC
-    idx = np.empty(len(fiber))
-    for i, j in enumerate(fiber):
-        diff = abs(camera - j)
-        idx[i] = np.where(diff == min(diff))[0][0]
-    
-    
-    fp_bpodtime = camera_bpod[idx.astype(int)] + (np.mean(np.diff(fiber))/1000)
-    fp_offset = fiber - camera[idx.astype(int)]
-    fp_bpodtime = camera_bpod[idx.astype(int)] + (fp_offset/1000)
-    # Then calibrate to bpod time
-    # Save times
-    fpath = Path(session_path).joinpath('alf', '_ibl_fluo.times.npy') 
-    np.save(fpath, fp_bpodtime)
-    
-    return fp_bpodtime
 
 def extract_fp_fluorescence(session_path):
     '''
@@ -119,6 +80,7 @@ def extract_fp_fluorescence(session_path):
     avg_loc2 : average fluorescence per frame for roi 2
     avg_loc3 : average fluorescence per frame for roi 3
     avg_loc4 : average fluorescence per frame for roi 4
+    camera_bpod : behavior camera timestamps which are also fluo times due to interp
     '''
     
     # Get paths
@@ -128,12 +90,13 @@ def extract_fp_fluorescence(session_path):
     ssv_loc4 = session_path + '/raw_video_data/' + '_iblrig_loc4Camera.timestamps.ssv'
     ssv_fiber = session_path + '/raw_video_data/' + '_iblrig_fiberCamera.timestamps.ssv'
     fiber_video = session_path + '/raw_video_data/' + '_iblrig_fiberCamera.raw.mp4'
+    ssv_camera = session_path + '/raw_video_data/' + '_iblrig_leftCamera.timestamps.ssv'
+    camera_bpod = np.load(session_path + '/alf/' + '_ibl_leftCamera.times.npy')
     
     # Extract noise roi from fiber timestamps file
     fiber = ssv_2_array(ssv_fiber, fiber_video)
     camera = ssv_2_array(ssv_camera, left_video, mode='left')[:,1]
-    # Remove bogus frames
-    skip = abs(len(fiber) - len(camera))
+    
     
     # Extract fluorescence
     loc1 = ssv_2_array(ssv_loc1, fiber_video)
@@ -150,6 +113,13 @@ def extract_fp_fluorescence(session_path):
     avg_loc3 = loc3[:,3] - avg_noise
     avg_loc4 = loc4[:,3] - avg_noise
     
+    
+    # Interpolate
+    avg_loc1 = np.interp(camera,fiber[:,1], avg_loc1)
+    avg_loc2 = np.interp(camera,fiber[:,1], avg_loc2)
+    avg_loc3 = np.interp(camera,fiber[:,1], avg_loc4)
+    avg_loc4 = np.interp(camera,fiber[:,1], avg_loc4)
+    
     # Save everything
     fpath = Path(session_path).joinpath('alf', '_ibl_noise.fluo.npy') 
     np.save(fpath, avg_noise)
@@ -161,14 +131,14 @@ def extract_fp_fluorescence(session_path):
     np.save(fpath, avg_loc3)
     fpath = Path(session_path).joinpath('alf', '_ibl_loc4.fluo.npy') 
     np.save(fpath, avg_loc4)
+    fpath = Path(session_path).joinpath('alf', '_ibl_fluo.times.npy') 
+    np.save(fpath, camera_bpod)
     
-    return avg_noise, avg_loc1, avg_loc2, avg_loc3, avg_lo
-
+    return avg_noise, avg_loc1, avg_loc2, avg_loc3, avg_loc4, camera_bpod
 
 
 if __name__ == "__main__":
     session_path = sys.argv[1]
-    extract_fp_time(session_path)
     extract_fp_fluorescence(session_path)
 
         
