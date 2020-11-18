@@ -90,6 +90,7 @@ def extract_fp_fluorescence(session_path):
     ssv_loc4 = session_path + '/raw_video_data/' + '_iblrig_loc4Camera.timestamps.ssv'
     ssv_fiber = session_path + '/raw_video_data/' + '_iblrig_fiberCamera.timestamps.ssv'
     fiber_video = session_path + '/raw_video_data/' + '_iblrig_fiberCamera.raw.mp4'
+    left_video = session_path + '/raw_video_data/' + '_iblrig_leftCamera.raw.mp4'
     ssv_camera = session_path + '/raw_video_data/' + '_iblrig_leftCamera.timestamps.ssv'
     camera_bpod = np.load(session_path + '/alf/' + '_ibl_leftCamera.times.npy')
     
