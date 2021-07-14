@@ -96,7 +96,7 @@ def extract_fp_daq(ses, save=False, correct_bleaching=True):
         signal.loc[signal['TTL_change']==1].index[np.where((np.diff(signal.loc[signal['TTL_change']==1].index)<sample_ITI*0.95) |
              (np.diff(signal.loc[signal['TTL_change']==1].index)>sample_ITI*1.05))[0]]
     for i in pulse_to_del:
-        print(len(pulse_to_del) noise frames)
+        print(str(len(pulse_to_del)) + 'noise frames')
         signal.iloc[i:int(i+sample_ITI*1.05), np.where(signal.columns=='DAQ_FP')[0]]=0
     # Update TTL change column
     signal['TTL_change'] = 0
