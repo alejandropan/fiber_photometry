@@ -3,11 +3,13 @@ import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
 from ibllib.io.extractors.biased_trials import extract_all
+from ibllib.io.extractors import camera
+from ibllib.io import ffmpeg
 from ibllib.io.extractors.training_wheel import extract_all as extract_all_wheel
 from pathlib import Path
 from distutils.dir_util import copy_tree
 import os
-
+import sys
 # Functions
 
 def bleach_correct(nacc, avg_window = 120, fr = 30):
@@ -22,7 +24,7 @@ def bleach_correct(nacc, avg_window = 120, fr = 30):
     '''
     # First calculate sliding window
     avg_window = int(avg_window*fr)
-    F = nacc.rolling(12000, center = True).mean()
+    F = nacc.rolling(avg_window, center = True).mean()
     nacc_corrected = (nacc - F)/F
     return nacc_corrected
 
@@ -41,7 +43,7 @@ def move_fp_data_to_alf(ses, dry=True):
         destination= ses+'/alf/fp_data'
         copy_tree(str(fp_path),destination)
 
-def extract_fp_daq(ses, save=False, correct_bleaching=True):
+def extract_fp_daq(ses, save=True, correct_bleaching=True):
     '''
     Extract FP data, aligned to bpod and to DAQ
     ses: path to session data (not fp folder) (str)
@@ -52,22 +54,46 @@ def extract_fp_daq(ses, save=False, correct_bleaching=True):
         fp_data = pd.read_csv(ses + '/alf/fp_data/FP470')
     except:
         fp_data = pd.read_csv(ses + '/alf/fp_data/FP470.csv')
-    fp_data = fp_data.rename(columns={'Region0G': 'DMS',
+    fp_data = fp_data.rename(columns={'Region2G': 'DMS',
                               'Region1G': 'NAcc',
-                              'Region2G': 'DLS'})
+                              'Region0G': 'DLS'})
     try:
         fp_data_415 = pd.read_csv(ses + '/alf/fp_data/FP415')
     except:
         fp_data_415 = pd.read_csv(ses + '/alf/fp_data/FP415.csv')
-    fp_data_415 = fp_data_415.rename(columns={'Region0G': 'DMS_isos',
+    fp_data_415 = fp_data_415.rename(columns={'Region2G': 'DMS_isos',
                                       'Region1G': 'NAcc_isos',
-                                      'Region2G': 'DLS_isos'})
+                                      'Region0G': 'DLS_isos'})
     bpod_feedback_time = np.load(ses + '/alf/_ibl_trials.feedback_times.npy')
 
-    assert (len(fp_data) - len(fp_data_415)) < 2 # Check that intermitent channels were not skipped
-    fp_data[['DMS_isos','NAcc_isos','DLS_isos']] = np.nan
-    fp_data.iloc[:len(fp_data_415),-3:] = \
-        fp_data_415[['DMS_isos','NAcc_isos','DLS_isos']]
+
+    inter_frames  = np.median(np.diff(fp_data['FrameCounter']))
+    inter_frames_415  = np.median(np.diff(fp_data['FrameCounter']))
+    assert inter_frames == inter_frames_415
+
+    if (len(np.unique(np.diff(fp_data['FrameCounter'])))>1) | (len(np.unique(np.diff(fp_data_415['FrameCounter'])))>1):
+        print('WARNING: %d 470 frames skipped, trying to fix it' \
+            %len(np.where(np.diff(fp_data['FrameCounter'])!= inter_frames)[0]))
+        print('WARNING: %d 415 frames skipped, trying to fix it' \
+            %len(np.where(np.diff(fp_data_415['FrameCounter'])!= inter_frames_415)[0]))
+        # Put frame counts on the same scale
+        fp_data_415['FrameCounter'] = fp_data_415['FrameCounter'].copy()-1
+        fp_data[['DMS_isos','NAcc_isos','DLS_isos']] = np.nan
+        for i in fp_data['FrameCounter'].to_numpy():
+            try:
+                fp_data.loc[fp_data['FrameCounter']==i, 'DMS_isos'] = \
+                    fp_data_415.loc[fp_data_415['FrameCounter']==i, 'DMS_isos']
+                fp_data.loc[fp_data['FrameCounter']==i, 'NAcc_isos'] = \
+                    fp_data_415.loc[fp_data_415['FrameCounter']==i, 'NAcc_isos']
+                fp_data.loc[fp_data['FrameCounter']==i, 'DLS_isos'] = \
+                    fp_data_415.loc[fp_data_415['FrameCounter']==i, 'DLS_isos']
+            except:
+                print('Missing iso frame')
+                continue
+    else:
+        fp_data[['DMS_isos','NAcc_isos','DLS_isos']] = np.nan
+        fp_data.iloc[:len(fp_data_415),-3:] = \
+            fp_data_415[['DMS_isos','NAcc_isos','DLS_isos']]
 
     # Load DAQ file
     for file in os.listdir(ses + '/alf/fp_data/'):
@@ -83,7 +109,7 @@ def extract_fp_daq(ses, save=False, correct_bleaching=True):
     ### Patch session if needed: Delete short pulses (sample smaller than frame aquisition rate) or pulses before acquistion for FP and big breaks (acquistion started twice)
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
     sample_ITI  = np.median(np.diff(signal.loc[signal['TTL_change']==1].index))
-
+    print(sample_ITI)
     while np.diff(signal.loc[signal['TTL_change']==1].index).max()>sample_ITI*4: #Session was started twice
         print('Session started twice')
         ttl_id = np.where(np.diff(signal.loc[signal['TTL_change']==1].index) ==
@@ -96,7 +122,7 @@ def extract_fp_daq(ses, save=False, correct_bleaching=True):
         signal.loc[signal['TTL_change']==1].index[np.where((np.diff(signal.loc[signal['TTL_change']==1].index)<sample_ITI*0.95) |
              (np.diff(signal.loc[signal['TTL_change']==1].index)>sample_ITI*1.05))[0]]
     for i in pulse_to_del:
-        print(str(len(pulse_to_del)) + 'noise frames')
+        print(len(pulse_to_del) + "noise frames")
         signal.iloc[i:int(i+sample_ITI*1.05), np.where(signal.columns=='DAQ_FP')[0]]=0
     # Update TTL change column
     signal['TTL_change'] = 0
@@ -184,3 +210,4 @@ if __name__ == "__main__":
     extract_all_wheel(ses, save=True)
     move_fp_data_to_alf(ses, dry=False)
     extract_fp_daq(ses, save=True)
+    camera.extract_all(ses, session_type='training', save=True)
