@@ -1,0 +1,71 @@
+# Check delays between response and feedback for bad trials
+import os
+from pathlib import Path
+import numpy as np
+import pandas as pd
+from psths import divide_in_trials
+import seaborn as sns
+from nptdms import TdmsFile
+
+
+MOUSE_FOLDER = '/Volumes/witten/Alex/Data/Subjects/fip_20'
+def load_mouse_dataset(MOUSE_FOLDER):
+    mouse_folder = Path(MOUSE_FOLDER)
+    data = pd.DataFrame()
+    list_subfolders_with_paths = [f.path for f in os.scandir(mouse_folder) if f.is_dir()]
+    counter=0 
+    for fld in list_subfolders_with_paths:
+        try:
+            ses = pd.DataFrame()
+            for file in os.listdir(fld + '/001/alf/fp_data/'):
+                if file.endswith(".tdms"):
+                    td_f = file
+            tdms_file = TdmsFile.read(fld + '/001/alf/fp_data/'+ td_f)
+            signal =pd.DataFrame()
+            signal['DAQ_FP'] = tdms_file._channel_data["/'Analog'/'AI0'"].data
+            signal['DAQ_bpod'] = tdms_file._channel_data["/'Analog'/'AI1'"].data
+            signal['DAQ_speaker'] = tdms_file._channel_data["/'Analog'/'AI2'"].data
+            signal['DAQ_FP'] = 1 * (signal['DAQ_FP']>=4)
+            signal['DAQ_bpod'] = 1 * (signal['DAQ_bpod']>=2)
+            signal['DAQ_speaker'] = 1 * (signal['DAQ_speaker']>=2)
+            signal.loc[np.where(signal['DAQ_bpod'].diff()==1)[0], 'bpod_on'] = 1
+            signal.loc[np.where(signal['DAQ_bpod'].diff()==-1)[0], 'bpod_off'] = 1
+            signal.loc[np.where(signal['DAQ_bpod'].diff()==1)[0], 'bpod_duration'] = \
+                signal.loc[signal['bpod_off']==1].index - \
+                signal.loc[signal['bpod_on']==1].index
+            signal.loc[signal['bpod_duration']>100, 'feedbackTimes'] = 1
+            signal['bpod_event'] = np.nan
+            signal.loc[signal['bpod_duration']>1000, 'bpod_event'] = 'error'
+            signal_frames = signal.loc[signal['bpod_event']=='error'].index
+            frames_to_keep = []
+            for i in signal_frames:
+                frames_to_keep.append(np.arange(i,i+1200).tolist())
+            flat_list = []
+            for sublist in frames_to_keep:
+                for item in sublist:
+                    flat_list.append(item)
+            signal_filtered = signal.loc[np.isin(signal.index, flat_list)].reset_index()
+            signal_filtered.loc[np.where(signal_filtered['DAQ_speaker'].diff()==1)[0],'sound_on'] = 1
+            double = signal_filtered.loc[signal_filtered['sound_on']==1,'sound_on'].index[1::2]
+            signal_filtered['sound_on'][double] = 0
+            assert len(signal_filtered.loc[signal_filtered['sound_on']==1])== \
+                len(signal_filtered.loc[signal_filtered['bpod_event']=='error'])
+            delta = signal_filtered.loc[signal_filtered['sound_on']==1].index - \
+                    signal_filtered.loc[signal_filtered['bpod_event']=='error'].index
+            # Add to dataframe
+            ses['delta'] = delta
+            ses['ses_number'] = counter
+            counter+=1
+            data=pd.concat([data,ses])
+        except:
+            print('Error in '+ str(path))    
+    return data
+
+
+# Load DAQ file
+data = load_mouse_dataset(MOUSE_FOLDER)
+#sns.histplot(data=data, x='delta', stat='probability')
+sns.histplot(data=data, x='delta', stat='probability', hue='ses_number', palette='viridis')
+plt.xlabel('State change to speaker sound')
+plt.ylabel('Fraction')
+plt.title(MOUSE_FOLDER)
