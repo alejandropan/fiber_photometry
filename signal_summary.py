@@ -7,7 +7,7 @@ def session_labeler(path):
     DMS = np.load(path+'/alf/_ibl_trials.DMS.npy')
     DLS = np.load(path+'/alf/_ibl_trials.DLS.npy')
     NAcc = np.load(path+'/alf/_ibl_trials.NAcc.npy')
-    raw = pd.read_csv(path + '/alf/fp_data/FP470_processed.csv')
+    raw = pd.read_csv(path + '/raw_fp_data/FP470_processed.csv')
     raw = raw.loc[raw['include']==1]
     _, ax = plt.subplots(3,4)
     regions=[DMS,DLS,NAcc]

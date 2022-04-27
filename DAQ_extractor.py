@@ -80,25 +80,19 @@ def move_fp_data_to_alf(ses, dry=True):
         destination= ses+'/alf/fp_data'
         copy_tree(str(fp_path),destination)
 
-def extract_fp_daq(ses, save=True, correct_bleaching=True):
+def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
     '''
     Extract FP data, aligned to bpod and to DAQ
     ses: path to session data (not fp folder) (str)
     save: whether to save new alf files
     '''
     # Load and rename FP files
-    loc_dict={'Region2G': 'NAcc','Region1G': 'DLS','Region0G': 'DMS'}
-    loc_dict_415={'Region2G': 'NAcc_isos','Region1G': 'DLS_isos','Region0G': 'DMS_isos'}
+    loc_dict={'Region2G': 'NAcc','Region1G': 'DMS','Region0G': 'DLS'}
     try:
-        fp_data = pd.read_csv(ses + '/alf/fp_data/FP470')
+        fp_data = pd.read_csv(ses + '/raw_fp_data/FP470')
     except:
-        fp_data = pd.read_csv(ses + '/alf/fp_data/FP470.csv')
+        fp_data = pd.read_csv(ses + '/raw_fp_data/FP470.csv')
     fp_data = fp_data.rename(columns=loc_dict)
-    try:
-        fp_data_415 = pd.read_csv(ses + '/alf/fp_data/FP415')
-    except:
-        fp_data_415 = pd.read_csv(ses + '/alf/fp_data/FP415.csv')
-    fp_data_415 = fp_data_415.rename(columns=loc_dict_415)
     bpod_feedback_time = np.load(ses + '/alf/_ibl_trials.feedback_times.npy')
 
     # Save location dictionary for signal summary
@@ -106,43 +100,15 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True):
         json.dump(loc_dict, fp)
 
     inter_frames  = np.median(np.diff(fp_data['FrameCounter']))
-    inter_frames_415  = np.median(np.diff(fp_data['FrameCounter']))
-    assert inter_frames == inter_frames_415
 
-    if (len(np.unique(np.diff(fp_data['FrameCounter'])))>1) | (len(np.unique(np.diff(fp_data_415['FrameCounter'])))>1):
+    if (len(np.unique(np.diff(fp_data['FrameCounter'])))>1):
         print('WARNING: %d 470 frames skipped' \
             %len(np.where(np.diff(fp_data['FrameCounter'])!= inter_frames)[0]))
-        print('WARNING: %d 415 frames skipped' \
-            %len(np.where(np.diff(fp_data_415['FrameCounter'])!= inter_frames_415)[0]))
-        '''
-        # Put frame counts on the same scale
-        fp_data_415['FrameCounter'] = fp_data_415['FrameCounter'].copy()-1
-        fp_data[['DMS_isos','NAcc_isos','DLS_isos']] = np.nan
-        for i in fp_data['FrameCounter'].to_numpy():
-            try:
-                fp_data.loc[fp_data['FrameCounter']==i, 'DMS_isos'] = \
-                    fp_data_415.loc[fp_data_415['FrameCounter']==i, 'DMS_isos']
-                fp_data.loc[fp_data['FrameCounter']==i, 'NAcc_isos'] = \
-                    fp_data_415.loc[fp_data_415['FrameCounter']==i, 'NAcc_isos']
-                fp_data.loc[fp_data['FrameCounter']==i, 'DLS_isos'] = \
-                    fp_data_415.loc[fp_data_415['FrameCounter']==i, 'DLS_isos']
-            except:
-                print('Missing iso frame')
-                continue        
-        '''   
-    else:
-        try:
-            fp_data[['DMS_isos','NAcc_isos','DLS_isos']] = np.nan
-            fp_data.iloc[:len(fp_data_415),-3:] = \
-                fp_data_415[['DMS_isos','NAcc_isos','DLS_isos']]
-        except:
-            print('Isosbestic data misaligned')
-
     # Load DAQ file
-    for file in os.listdir(ses + '/alf/fp_data/'):
+    for file in os.listdir(ses + '/raw_fp_data/'):
         if file.endswith(".tdms"):
             td_f = file
-    tdms_file = TdmsFile.read(ses + '/alf/fp_data/'+ td_f)
+    tdms_file = TdmsFile.read(ses + '/raw_fp_data/'+ td_f)
     signal =pd.DataFrame()
     signal['DAQ_FP'] = tdms_file._channel_data["/'Analog'/'AI0'"].data
     signal['DAQ_bpod'] = tdms_file._channel_data["/'Analog'/'AI1'"].data
@@ -152,8 +118,8 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True):
     ### Patch session if needed: Delete short pulses (sample smaller than frame aquisition rate) or pulses before acquistion for FP and big breaks (acquistion started twice)
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
     sample_ITI  = np.median(np.diff(signal.loc[signal['TTL_change']==1].index))
-    if sample_ITI==10: #New protocol saves ITI for all: 470,145 and 2x empty frames
-        true_FP = signal.loc[signal['TTL_change']==1].index[::4]
+    if (sample_ITI==10): #New protocol saves ITI for all: 470,145 and 2x empty frames
+        true_FP = signal.loc[signal['TTL_change']==1].index[::int((1000/framerate)/sample_ITI)]
         signal['TTL_change']= 0
         signal['DAQ_FP']= 0
         signal.iloc[true_FP,signal.columns.get_loc('TTL_change')]=1
@@ -174,12 +140,11 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True):
         signal.loc[signal['TTL_change']==1].index[np.where((np.diff(signal.loc[signal['TTL_change']==1].index)<sample_ITI*0.95) |
              (np.diff(signal.loc[signal['TTL_change']==1].index)>sample_ITI*1.05))[0]]
     for i in pulse_to_del:
-        print(len(pulse_to_del) + "noise frames")
         signal.iloc[i:int(i+sample_ITI*1.05), np.where(signal.columns=='DAQ_FP')[0]]=0
     # Update TTL change column
     signal['TTL_change'] = 0
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
-    assert abs(len(np.where(signal['DAQ_FP'].diff()==1)[0]) - len(fp_data)) < 6
+    assert abs(len(np.where(signal['DAQ_FP'].diff()==1)[0]) - len(fp_data)) < 10
 
     # Align events
     fp_data['DAQ_timestamp'] = np.nan
@@ -283,9 +248,7 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True):
                 fp_data['DAQ_timestamp'].to_numpy())
         np.save(ses+'/alf/_ibl_fluo.times.npy',
                 fp_data['bpod_time'].to_numpy())
-        fp_data.to_csv(ses+'/alf/fp_data/FP470_processed.csv')
-
-
+        fp_data.to_csv(ses+'/raw_fp_data/FP470_processed.csv')
 
 def extract_fp_daq_noiso_opto(ses, save=True, correct_bleaching=True):
     '''
@@ -295,18 +258,18 @@ def extract_fp_daq_noiso_opto(ses, save=True, correct_bleaching=True):
     '''
     # Load and rename FP files
     try:
-        fp_data = pd.read_csv(ses + '/alf/fp_data/FP470')
+        fp_data = pd.read_csv(ses + '/raw_fp_data/FP470')
     except:
-        fp_data = pd.read_csv(ses + '/alf/fp_data/FP470.csv')
+        fp_data = pd.read_csv(ses + '/raw_fp_data/FP470.csv')
     fp_data = fp_data.rename(columns={'Region2G': 'NAcc',
                               'Region1G': 'DLS',
                               'Region0G': 'DMS'})
     bpod_feedback_time =  np.load(ses + '/alf/_ibl_trials.feedback_times.npy')
     # Load DAQ file
-    for file in os.listdir(ses + '/alf/fp_data/'):
+    for file in os.listdir(ses + '/raw_fp_data/'):
         if file.endswith(".tdms"):
             td_f = file
-    tdms_file = TdmsFile.read(ses + '/alf/fp_data/'+ td_f)
+    tdms_file = TdmsFile.read(ses + '/raw_fp_data/'+ td_f)
     signal =pd.DataFrame()
     signal['DAQ_FP'] = tdms_file._channel_data["/'Analog'/'AI0'"].data
     signal['DAQ_bpod'] = tdms_file._channel_data["/'Analog'/'AI1'"].data
@@ -447,15 +410,14 @@ def extract_fp_daq_noiso_opto(ses, save=True, correct_bleaching=True):
                 fp_data['DAQ_timestamp'].to_numpy())
         np.save(ses+'/alf/_ibl_fluo.times.npy',
                 fp_data['bpod_time'].to_numpy())
-        fp_data.to_csv(ses+'/alf/fp_data/FP470_processed.csv')
+        fp_data.to_csv(ses+'/raw_fp_data/FP470_processed.csv')
 
 
 if __name__ == "__main__":
     ses = sys.argv[1]
     opto = sys.argv[2]
-    #extract_all(ses, save=True)
-    #extract_all_wheel(ses, save=True)
-    #move_fp_data_to_alf(ses, dry=False)
+    extract_all(ses, save=True)
+    extract_all_wheel(ses,  save=True)
     if opto=='True':
         extract_fp_daq_noiso_opto(ses, save=True)
     else:
