@@ -1,6 +1,7 @@
 import numpy as np 
 import pandas as pd
 from scipy import interpolate
+import sys
 
 def get_unixtime(dt64):
     return dt64.astype('datetime64[ns]').astype('int')
@@ -30,6 +31,6 @@ def extract_screen_time (ses):
 
 
 if __name__ == "__main__":
-	ses = sys.argv[1]
+    ses = sys.argv[1]
     data = extract_screen_time(ses)
     data.to_csv(ses+'/alf/_ibl_trials.screen_info.csv')
