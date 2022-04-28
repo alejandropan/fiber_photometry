@@ -18,7 +18,7 @@ def extract_screen_time (ses):
     stim_from_bonsai = data.loc[~np.isnan(data['contrast_of_feedback']), 'contrast_of_feedback']
     stims = np.nan_to_num(np.load(ses+'/alf/_ibl_trials.contrastRight.npy')) + np.nan_to_num(np.load(ses+'/alf/_ibl_trials.contrastLeft.npy'))
     stim_times = np.load(ses+'/alf/_ibl_trials.stimOnTrigger_times.npy') 
-    if len(stim_times) != len(data.loc[data['reward']==True]): #First contrast is not send for some reason
+    if len(stim_times) != len(data.loc[data['stim']==True]): #First contrast is not send for some reason
         assert np.sum(abs(stims[1:] - stim_from_bonsai)) == 0
         stim_times = stim_times[1:]
     data['bpod_time'] = np.nan
