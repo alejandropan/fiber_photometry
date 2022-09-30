@@ -1,8 +1,17 @@
+## Objectives of optimization:
+# Measure difference between LED times and DAQ times to begin with
+# Check for skipped frames
+
 from nptdms import TdmsFile
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
 from ibllib.io.extractors.biased_trials import extract_all
+from ibllib.io.extractors.training_trials import (
+    Choice, FeedbackTimes, FeedbackType, GoCueTimes, GoCueTriggerTimes,
+    IncludedTrials, Intervals, ItiDuration, ProbabilityLeft, ResponseTimes, RewardVolume,
+    StimOnTimes_deprecated, StimOnTriggerTimes, StimOnOffFreezeTimes, ItiInTimes,
+    StimOffTriggerTimes, StimFreezeTriggerTimes, ErrorCueTriggerTimes)
 from ibllib.io.extractors import camera
 from ibllib.io import ffmpeg
 from ibllib.io.extractors.training_wheel import extract_all as extract_all_wheel
@@ -25,7 +34,7 @@ def photobleaching_qc (raw_signal, frame_window = 1000):
 
 def dff_qc (dff,thres=0.05, frame_interval=40):
     separation_min = 2000/frame_interval #2 seconds separation (10 min)
-    peaks = np.where(dff>0.05)[0]
+    peaks = np.where(dff>thres)[0]
     qc = 1*(len(np.where(np.diff(peaks)>separation_min)[0])>5)
     return qc
 
@@ -87,7 +96,7 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
     save: whether to save new alf files
     '''
     # Load and rename FP files
-    loc_dict={'Region2G': 'NAcc','Region1G': 'DMS','Region0G': 'DLS'}
+    loc_dict={'Region2G': 'DLS','Region1G': 'NAcc','Region0G': 'DMS'}
     try:
         fp_data = pd.read_csv(ses + '/raw_fp_data/FP470')
     except:
@@ -118,6 +127,7 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
     ### Patch session if needed: Delete short pulses (sample smaller than frame aquisition rate) or pulses before acquistion for FP and big breaks (acquistion started twice)
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
     sample_ITI  = np.median(np.diff(signal.loc[signal['TTL_change']==1].index))
+
     if (sample_ITI==10): #New protocol saves ITI for all: 470,145 and 2x empty frames
         true_FP = signal.loc[signal['TTL_change']==1].index[::int((1000/framerate)/sample_ITI)]
         signal['TTL_change']= 0
@@ -128,7 +138,8 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
         signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
         sample_ITI  = np.median(np.diff(signal.loc[signal['TTL_change']==1].index))
     print(sample_ITI)
-    while np.diff(signal.loc[signal['TTL_change']==1].index).max()>sample_ITI*4: #Session was started twice
+
+    while np.diff(signal.loc[signal['TTL_change']==1].index).max()>sample_ITI*10: #Session was started twice
         print('Session started twice')
         ttl_id = np.where(np.diff(signal.loc[signal['TTL_change']==1].index) ==
                  np.diff(signal.loc[signal['TTL_change']==1].index).max())[0][0]
@@ -136,15 +147,40 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
         signal.iloc[:int(real_id+np.diff(signal.loc[signal['TTL_change']==1].index).max()
                          -sample_ITI),:] = 0
 
+    ## Check for skipped frames
+    max_inter_led = np.diff(signal.loc[signal['TTL_change']==1].index).max()
+    min_inter_led = np.diff(signal.loc[signal['TTL_change']==1].index).min()
+    max_inter_frame = np.diff(fp_data.Timestamp*1000).max()
+    min_inter_frame = np.diff(fp_data.Timestamp*1000).min()
+    if ((max_inter_led - min_inter_led)/sample_ITI >= 1)|((max_inter_frame - min_inter_frame)/sample_ITI >= 1):
+        if (max_inter_led - min_inter_led)/sample_ITI >= 1:
+            print(ses + ' skipped LEDs')
+        if (max_inter_led - min_inter_led)/sample_ITI >= 1:
+            print(ses+' skipped LEDs')
+        led_len = len(signal.loc[signal['TTL_change']==1].index)
+        skipped_leds = np.where(np.diff(signal.loc[signal['TTL_change']==1].index[:(led_len-50)])>=(sample_ITI*2))[0] #[:-50] is to ignore the end led extra pulses
+        skipped_frames = np.where(np.diff(fp_data.Timestamp[:(led_len-50)]*1000)>=(sample_ITI*2))[0]
+        if np.equal(skipped_leds, skipped_frames)==False:
+            return print('ERROR: skipped frames dont match TTLs')
+        else:
+            print('skipped frames match ttls, uff')            
+
+    ##
     pulse_to_del = \
         signal.loc[signal['TTL_change']==1].index[np.where((np.diff(signal.loc[signal['TTL_change']==1].index)<sample_ITI*0.95) |
              (np.diff(signal.loc[signal['TTL_change']==1].index)>sample_ITI*1.05))[0]]
+
     for i in pulse_to_del:
         signal.iloc[i:int(i+sample_ITI*1.05), np.where(signal.columns=='DAQ_FP')[0]]=0
+
     # Update TTL change column
     signal['TTL_change'] = 0
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
-    assert abs(len(np.where(signal['DAQ_FP'].diff()==1)[0]) - len(fp_data)) < 10
+
+    led_number = len(pd.read_csv(ses + '/raw_fp_data/output_0_timestamps', header=None)[::2])
+
+
+    assert abs(len(np.where(signal['DAQ_FP'].diff()==1)[0]) - len(fp_data)) < 15
 
     # Align events
     fp_data['DAQ_timestamp'] = np.nan
@@ -170,7 +206,7 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
     assert abs((len(signal.loc[signal['feedbackTimes']==1]) - \
         len(bpod_feedback_time))) <=1
     signal['bpod_time'] = np.nan
-    choices = np.load(ses+'/alf/_ibl_trials.choice.npy')
+    choices = np.load(ses+'/alf/_ibl_trials.choice.npy') 
     nan_trials  = np.where(choices==0)[0] # No choice was made
     if len(nan_trials) != 0:
             try: # For new code with bpod pulses also in NO GOs
@@ -281,7 +317,7 @@ def extract_fp_daq_noiso_opto(ses, save=True, correct_bleaching=True):
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
     sample_ITI  = np.median(np.diff(signal.loc[signal['TTL_change']==1].index))
     if sample_ITI==10: #New protocol saves ITI for all: 470,145 and 2x empty frames
-        true_FP = signal.loc[signal['TTL_change']==1].index[::4]
+        true_FP = signal.loc[signal['TTL_change']==1].index[::2]
         signal['TTL_change']= 0
         signal['DAQ_FP']= 0
         signal.iloc[true_FP,signal.columns.get_loc('TTL_change')]=1
@@ -307,7 +343,7 @@ def extract_fp_daq_noiso_opto(ses, save=True, correct_bleaching=True):
     # Update TTL change column
     signal['TTL_change'] = 0
     signal.loc[np.where(signal['DAQ_FP'].diff()==1)[0], 'TTL_change'] = 1
-    assert abs(len(np.where(signal['DAQ_FP'].diff()==1)[0]) - len(fp_data)) < 10
+    assert abs(len(np.where(signal['DAQ_FP'].diff()==1)[0]) - len(fp_data)) < 1
 
     # Align events
     fp_data['DAQ_timestamp'] = np.nan

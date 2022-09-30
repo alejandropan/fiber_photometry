@@ -1,29 +1,32 @@
 import sys
 import os
 from pathlib import Path
-from ibllib.io.ffmpeg import iblrig_video_compression
+from ibllib.io.extractors.camera import extract_all
 from os import listdir
 from os.path import isfile, join
 
 topdir = sys.argv[1]
 os.chdir(topdir)
-all_subdirs = [x[0] for x in os.walk('./') if 'raw_video_data' in x[0]]
+all_subdirs = [x[0] for x in os.walk('./')]
 
 for sdx, sessiondir in enumerate(all_subdirs):
 	if 'raw_video_data' not in sessiondir: # Skip all directories that don't end in raw_video_data
 		continue
 
 	files = [f for f in listdir(sessiondir) if isfile(join(sessiondir, f))]
-	if '_iblrig_leftCamera.raw.avi' not in files: # Skip all directories where raw_video_data does not actually contain a video
+	if '_iblrig_leftCamera.raw.mp4' not in files: # Skip all directories that we haven't already compressed
 		continue
 
-	if '_iblrig_leftCamera.raw.mp4' in files: # Skip all directories that we have already compressed
-		continue
+
+	# Delete GPIO file, if necessary
+	if '_iblrig_leftCamera.GPIO.bin' in files:
+		os.remove(join(sessiondir, '_iblrig_leftCamera.GPIO.bin'))
 
 	print('%d/%d %s' % (sdx, len(all_subdirs), sessiondir), end=' ', flush=True)
 	session_path = Path(sessiondir[:-14])
-	command = ('ffmpeg -i {file_in} -y -codec:v libx264 -preset slow -crf 29 '
-    		   '-nostats -loglevel 0 -codec:a copy {file_out}')
-
-	iblrig_video_compression(session_path, command)
-	print('compressed')
+	try:
+		extract_all(session_path, session_type='training')
+		print('extracted')
+	except:
+		print('failed')
+	
