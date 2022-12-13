@@ -197,7 +197,7 @@ def plot_calibration(ses,ses_water, power_list):
     ses = '/Volumes/witten/Alex/Data/calibration_chrmine/dchr1_opto_bandit_cs/calibration/002'
     ses_water = '/Volumes/witten/Alex/Data/calibration_chrmine/dchr1_opto_bandit_cs/session/001'
     b,a = butter(4, 5/(100/2),'lowpass') # butter filter: order 4, 2hz objective frequency, lowpass
-    cmap = get_cmap('summer')
+    cmap = plt.get_cmap('summer')
     opto_sync = pd.read_csv(ses+'/alf/opto_cal_sync.csv')
     dms = np.load(ses+'/alf/_ibl_trials.DMS.npy')
     dls = np.load(ses+'/alf/_ibl_trials.DLS.npy')
