@@ -190,7 +190,7 @@ def extract_everything (ses):
     print(opto.loc[~np.isnan(opto['DA_train_start'])])
     opto.loc[~np.isnan(opto['DA_train_start'])].reset_index().to_csv(ses+'/alf/opto_cal_sync.csv')
 
-def plot_calibration(ses,ses_water, power_list):
+def plot_calibration():
     fig, ax = plt.subplots(2,3)
     # MOUSE 1
     power_list = [0.75,0.5,0.3, 0.1, 0.005]
@@ -302,3 +302,145 @@ def plot_calibration(ses,ses_water, power_list):
         plt.ylabel('DF/F')
         sns.despine()
     
+def plot_session():
+    fig, ax = plt.subplots(2,3)
+    # MOUSE 1
+    ses = '/Volumes/witten-1/Alex/Data/Subjects/DChR2_1/2022-03-04/001'
+    #ses = '/Volumes/witten/Alex/Data/Subjects/DChR2_1/2022-02-28/001'
+    b,a = butter(4, 5/(100/2),'lowpass') # butter filter: order 4, 2hz objective frequency, lowpass
+    cmap = plt.get_cmap('summer')
+    dms = np.load(ses+'/alf/_ibl_trials.DMS.npy')
+    dls = np.load(ses+'/alf/_ibl_trials.DLS.npy')
+    nacc = np.load(ses+'/alf/_ibl_trials.NAcc.npy')
+    opto_trials = np.intersect1d(np.where(np.load(ses+'/alf/_ibl_trials.feedbackType.npy')==1), 
+                    np.where(np.load(ses+'/alf/_ibl_trials.opto_block.npy')==1))
+    water_trials = np.intersect1d(np.where(np.load(ses+'/alf/_ibl_trials.feedbackType.npy')==1), 
+                    np.where(np.load(ses+'/alf/_ibl_trials.opto_block.npy')==0))
+    water_timestamps = np.load(ses+'/alf/_ibl_trials.feedback_daq_times.npy')[water_trials]
+    laser_timestamps = np.load(ses+'/alf/_ibl_trials.feedback_daq_times.npy')[opto_trials]
+    water_nacc =  np.load(ses+'/alf/_ibl_trials.NAcc.npy')
+    water_dms =  np.load(ses+'/alf/_ibl_trials.DMS.npy')
+    water_dls =  np.load(ses+'/alf/_ibl_trials.DLS.npy')
+    labels = ['NAcc','DMS','DLS']
+    timestamps =  np.load(ses+'/alf/_ibl_trials.DAQ_timestamps.npy')
+    fluos = [nacc,dms,dls]
+    fluos_water = [water_nacc,water_dms,water_dls]
+    for axes in np.arange(3):
+        plt.sca(ax[0,axes])
+        fluo = fluos[axes]
+        fluo[np.where(np.isnan(fluo))[0]] = 0 #deal with nan
+        fluo = filtfilt(b,a,fluo)
+        idx = water_timestamps[:100]
+        reg = np.zeros([len(water_timestamps),175])
+        fluo_water = fluos_water[axes]
+        fluo_water[np.where(np.isnan(fluo_water))[0]] = 0 #deal with nan
+        fluo_water = filtfilt(b,a,fluo_water)        
+        for i, ids in enumerate(idx):
+            frame = np.where(abs(timestamps-ids)==np.min(abs(timestamps-ids)))[0][0]#closest frame
+            if frame == 0:
+                reg[i,:] = np.nan
+            else:
+                reg[i,:] = fluo_water[frame-25:frame+150]
+        m = np.nanmean(reg,axis=0)
+        time = np.arange(-500,3000,20)
+        error = sem(reg,axis=0, nan_policy='omit')
+        plt.plot(time, m, color='k')
+        plt.fill_between(time, m-error, m+error, color='b')
+        plt.title(labels[axes])
+        plt.xlabel('Time from outcome')
+        plt.ylabel('DF/F')
+        sns.despine()
+        fluo = fluos[axes]
+        fluo[np.where(np.isnan(fluo))[0]] = 0 #deal with nan
+        fluo = filtfilt(b,a,fluo)
+        idx = laser_timestamps[:100]
+        reg = np.zeros([len(laser_timestamps),175])
+        fluo_water = fluos_water[axes]
+        fluo_water[np.where(np.isnan(fluo_water))[0]] = 0 #deal with nan
+        fluo_water = filtfilt(b,a,fluo_water)        
+        for i, ids in enumerate(idx):
+            frame = np.where(abs(timestamps-ids)==np.min(abs(timestamps-ids)))[0][0]#closest frame
+            if frame == 0:
+                reg[i,:] = np.nan
+            else:
+                reg[i,:] = fluo_water[frame-25:frame+150]
+        m = np.nanmean(reg,axis=0)
+        time = np.arange(-500,3000,20)
+        error = sem(reg,axis=0, nan_policy='omit')
+        plt.plot(time, m, color='k')
+        plt.fill_between(time, m-error, m+error, color='r')
+        plt.title(labels[axes])
+        plt.xlabel('Time from outcome')
+        plt.ylabel('DF/F')
+        sns.despine()
+    # MOUSE 2
+    # /Volumes/witten/Alex/Data/Subjects/DChR2_2/2022-02-09/001
+    # '/Volumes/witten/Alex/Data/Subjects/DChR2_2/2022-03-02/001'
+    ses = '/Volumes/witten/Alex/Data/Subjects/DChR2_2/2022-02-09/001'
+    b,a = butter(4, 5/(100/2),'lowpass') # butter filter: order 4, 2hz objective frequency, lowpass
+    cmap = plt.get_cmap('summer')
+    dms = np.load(ses+'/alf/_ibl_trials.DMS.npy')
+    dls = np.load(ses+'/alf/_ibl_trials.DLS.npy')
+    nacc = np.load(ses+'/alf/_ibl_trials.NAcc.npy')
+    opto_trials = np.intersect1d(np.where(np.load(ses+'/alf/_ibl_trials.feedbackType.npy')==1), 
+                    np.where(np.load(ses+'/alf/_ibl_trials.opto_block.npy')==1))
+    water_trials = np.intersect1d(np.where(np.load(ses+'/alf/_ibl_trials.feedbackType.npy')==1), 
+                    np.where(np.load(ses+'/alf/_ibl_trials.opto_block.npy')==0))
+    water_timestamps = np.load(ses+'/alf/_ibl_trials.feedback_daq_times.npy')[water_trials]
+    laser_timestamps = np.load(ses+'/alf/_ibl_trials.feedback_daq_times.npy')[opto_trials]
+    water_nacc =  np.load(ses+'/alf/_ibl_trials.NAcc.npy')
+    water_dms =  np.load(ses+'/alf/_ibl_trials.DMS.npy')
+    water_dls =  np.load(ses+'/alf/_ibl_trials.DLS.npy')
+    labels = ['NAcc','DMS','DLS']
+    timestamps =  np.load(ses+'/alf/_ibl_trials.DAQ_timestamps.npy')
+    fluos = [nacc,dms,dls]
+    fluos_water = [water_nacc,water_dms,water_dls]
+    for axes in np.arange(3):
+        plt.sca(ax[1,axes])
+        fluo = fluos[axes]
+        fluo[np.where(np.isnan(fluo))[0]] = 0 #deal with nan
+        fluo = filtfilt(b,a,fluo)
+        idx = water_timestamps[:100]
+        reg = np.zeros([len(water_timestamps),175])
+        fluo_water = fluos_water[axes]
+        fluo_water[np.where(np.isnan(fluo_water))[0]] = 0 #deal with nan
+        fluo_water = filtfilt(b,a,fluo_water)        
+        for i, ids in enumerate(idx):
+            frame = np.where(abs(timestamps-ids)==np.min(abs(timestamps-ids)))[0][0]#closest frame
+            if frame == 0:
+                reg[i,:] = np.nan
+            else:
+                reg[i,:] = fluo_water[frame-25:frame+150]
+        m = np.nanmean(reg,axis=0)
+        time = np.arange(-500,3000,20)
+        error = sem(reg,axis=0, nan_policy='omit')
+        plt.plot(time, m, color='k')
+        plt.fill_between(time, m-error, m+error, color='b')
+        plt.title(labels[axes])
+        plt.xlabel('Time from outcome')
+        plt.ylabel('DF/F')
+        sns.despine()
+        fluo = fluos[axes]
+        fluo[np.where(np.isnan(fluo))[0]] = 0 #deal with nan
+        fluo = filtfilt(b,a,fluo)
+        idx = laser_timestamps[:100]
+        reg = np.zeros([len(laser_timestamps),175])
+        fluo_water = fluos_water[axes]
+        fluo_water[np.where(np.isnan(fluo_water))[0]] = 0 #deal with nan
+        fluo_water = filtfilt(b,a,fluo_water)        
+        for i, ids in enumerate(idx):
+            frame = np.where(abs(timestamps-ids)==np.min(abs(timestamps-ids)))[0][0]#closest frame
+            if frame == 0:
+                reg[i,:] = np.nan
+            else:
+                reg[i,:] = fluo_water[frame-25:frame+150]
+        m = np.nanmean(reg,axis=0)
+        time = np.arange(-500,3000,20)
+        error = sem(reg,axis=0, nan_policy='omit')
+        plt.plot(time, m, color='k')
+        plt.fill_between(time, m-error, m+error, color='r')
+        plt.title(labels[axes])
+        plt.xlabel('Time from outcome')
+        plt.ylabel('DF/F')
+        sns.despine()
+

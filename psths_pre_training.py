@@ -394,10 +394,10 @@ sessions = [
 '/Volumes/witten/Alex/Data/Subjects/fip_27/2022-03-30/001',
 '/Volumes/witten/Alex/Data/Subjects/fip_28/2022-03-31/001',
 '/Volumes/witten/Alex/Data/Subjects/fip_29/2022-03-30/001',
-'/Volumes/witten/Alex/Data/Subjects/fip_30/2022-05-19/003',
-'/Volumes/witten/Alex/Data/Subjects/fip_32/2022-05-19/001',
-'/Volumes/witten/Alex/Data/Subjects/fip_31/2022-05-19/001',
-'/Volumes/witten/Alex/Data/Subjects/fip_33/2022-05-19/002']
+'/Volumes/witten/Alex/Data/Subjects/fip_30/2022-06-22/001',
+'/Volumes/witten/Alex/Data/Subjects/fip_32/2022-06-22/001',
+'/Volumes/witten/Alex/Data/Subjects/fip_31/2022-06-22/002',
+'/Volumes/witten/Alex/Data/Subjects/fip_33/2022-06-22/001']
 # Fist session
 plot_stim_psth(sessions, hems)
 

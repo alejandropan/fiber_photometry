@@ -38,7 +38,6 @@ def dff_qc (dff,thres=0.05, frame_interval=40):
     qc = 1*(len(np.where(np.diff(peaks)>separation_min)[0])>5)
     return qc
 
-
 def bleach_correct(nacc, avg_window = 60, fr = 25):
     '''
     Correct for bleaching of gcamp across the session. Calculates
@@ -96,7 +95,7 @@ def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
     save: whether to save new alf files
     '''
     # Load and rename FP files
-    loc_dict={'Region2G': 'DLS','Region1G': 'NAcc','Region0G': 'DMS'}
+    loc_dict={'Region2G': 'NAcc','Region1G': 'DLS','Region0G': 'DMS'}
     try:
         fp_data = pd.read_csv(ses + '/raw_fp_data/FP470')
     except:

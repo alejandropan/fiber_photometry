@@ -5,12 +5,12 @@ from pathlib import Path
 from os import listdir
 from os.path import isfile, join
 from screen_extractor import*
-from ibllib.io.extractors.training_trials import StimOffTriggerTimes
-
+from ibllib.io.extractors.training_trials import StimOffTriggerTimes, StimOnTriggerTimes
+from ibllib.io.extractors.biased_trials import extract_all
 
 def extract_all_features(ses):
-	#extract_all(ses, save=True, extra_classes=[StimOffTriggerTimes])
-	#extract_all_wheel(ses,  save=True)
+	extract_all(ses, save=True,  settings={'IBLRIG_VERSION_TAG': '4.9.0'}, extra_classes=[StimOffTriggerTimes,StimOnTriggerTimes]) # set settings for earlier version
+	extract_all_wheel(ses,  save=True)
 	extract_fp_daq(ses, save=True)
 	session_labeler(ses)
 	extract_screen_time(ses)
@@ -32,6 +32,3 @@ if __name__ == "__main__":
 		except:
 			errors.append(session_path)
 	print(errors)
-
-
-
