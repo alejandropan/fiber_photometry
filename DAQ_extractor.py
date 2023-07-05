@@ -88,14 +88,18 @@ def move_fp_data_to_alf(ses, dry=True):
         destination= ses+'/alf/fp_data'
         copy_tree(str(fp_path),destination)
 
-def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50):
+def extract_fp_daq(ses, save=True, correct_bleaching=True, framerate=50, 
+                   dms_on_right=True):
     '''
     Extract FP data, aligned to bpod and to DAQ
     ses: path to session data (not fp folder) (str)
     save: whether to save new alf files
     '''
     # Load and rename FP files
-    loc_dict={'Region2G': 'NAcc','Region1G': 'DLS','Region0G': 'DMS'}
+    if dms_on_right:
+        loc_dict={'Region2G': 'NAcc','Region1G': 'DLS','Region0G': 'DMS'}
+    else:
+        loc_dict={'Region2G': 'NAcc','Region1G': 'DMS','Region0G': 'DLS'}     
     try:
         fp_data = pd.read_csv(ses + '/raw_fp_data/FP470')
     except:
