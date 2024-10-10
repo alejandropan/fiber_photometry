@@ -26,12 +26,6 @@ from signal_summary import session_labeler
 
 # Functions
 
-def photobleaching_qc (raw_signal, frame_window = 1000):
-    init = raw_signal[100:1100].mean()
-    last = raw_signal[-1100:-100].mean() #100 is to avoid init and end artifacts
-    qc = 1*((last/init)>0.8)
-    return qc
-
 def dff_qc (dff, thres=0.01, thres_z=3, frame_interval=20):
     "Check if there is a transient 3x s.d or higher every 10 min if not exclude"
     peaks = np.where(dff>thres)[0]
